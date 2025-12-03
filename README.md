@@ -1,5 +1,7 @@
 # Package schema
 
+[![GoDoc](https://godoc.org/github.com/genelet/schema?status.svg)](https://godoc.org/github.com/genelet/schema)
+
 Package `schema` provides unified protobuf-based data structures for describing hierarchical configuration schemas. It consolidates types from `horizon/utils`, `determined/det`, and `grand/spec` into a single shared definition.
 
 ## Overview
