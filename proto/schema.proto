@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package schema;
+
+option go_package = "github.com/genelet/schema";
+
+// Struct represents a type specification for dynamic unmarshaling and service orchestration.
+//
+// Fields:
+//   - ClassName: The Go struct type name (also serves as ObjectName for service orchestration)
+//   - ServiceName: The service to delegate read/write operations to
+//   - Fields: Nested field specifications
+message Struct {
+  string ClassName = 1;    // Go struct type name / object identifier
+  string ServiceName = 2;  // Service name for delegation (read/write operations)
+  map<string, Value> fields = 3;
+}
+
+// Value represents a typed field specification.
+// It can be one of four kinds: SingleStruct, ListStruct, MapStruct, or Map2Struct.
+message Value {
+  oneof kind {
+    Struct single_struct = 1;      // Single nested struct
+    ListStruct list_struct = 2;    // List/slice of structs
+    MapStruct map_struct = 3;      // Map with string keys
+    Map2Struct map2_struct = 4;    // Two-level nested map (map[[2]string]T)
+  }
+}
+
+// ListStruct represents a list/slice of Struct specifications.
+message ListStruct {
+  repeated Struct list_fields = 1;
+}
+
+// MapStruct represents a map with string keys to Struct specifications.
+message MapStruct {
+  map<string, Struct> map_fields = 1;
+}
+
+// Map2Struct represents a two-level nested map structure for map[[2]string]T types.
+// The outer map uses the first key, the inner MapStruct uses the second key.
+message Map2Struct {
+  map<string, MapStruct> map2_fields = 1;
+}

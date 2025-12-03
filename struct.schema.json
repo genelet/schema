@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/genelet/schema/struct",
+  "title": "Struct",
+  "description": "A specification structure for microservice field mappings",
+
+  "definitions": {
+    "Struct": {
+      "type": "object",
+      "properties": {
+        "object_name": {
+          "type": "string",
+          "description": "The name of the object/class this struct represents"
+        },
+        "service_name": {
+          "type": "string",
+          "description": "The name of the service to handle this struct"
+        },
+        "fields": {
+          "type": "object",
+          "description": "Map of field names to their Value specifications",
+          "additionalProperties": {
+            "$ref": "#/definitions/Value"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "Value": {
+      "type": "object",
+      "description": "A value can be one of: single_struct, list_struct, map_struct, or map2_struct",
+      "oneOf": [
+        {
+          "properties": {
+            "single_struct": { "$ref": "#/definitions/Struct" }
+          },
+          "required": ["single_struct"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "list_struct": { "$ref": "#/definitions/ListStruct" }
+          },
+          "required": ["list_struct"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "map_struct": { "$ref": "#/definitions/MapStruct" }
+          },
+          "required": ["map_struct"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "map2_struct": { "$ref": "#/definitions/Map2Struct" }
+          },
+          "required": ["map2_struct"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "ListStruct": {
+      "type": "object",
+      "description": "A list/array of Struct specifications",
+      "properties": {
+        "list_fields": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Struct" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "MapStruct": {
+      "type": "object",
+      "description": "A map of string keys to Struct specifications",
+      "properties": {
+        "map_fields": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/Struct" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "Map2Struct": {
+      "type": "object",
+      "description": "A two-level map: string -> string -> Struct (via MapStruct)",
+      "properties": {
+        "map2_fields": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/MapStruct" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+
+  "$ref": "#/definitions/Struct"
+}
