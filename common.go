@@ -505,8 +505,11 @@ func newServiceMap2Struct(specs map[[2]string][2]any) (*Map2Struct, error) {
 // newEndStruct creates an end-node Struct from a string slice.
 // The slice must have at least 2 elements: [className, serviceName].
 func newEndStruct(v []string) (*Struct, error) {
-	if len(v) < 2 {
-		return nil, fmt.Errorf("too few elements: %d (need at least 2)", len(v))
+	if len(v) < 1 {
+		return nil, fmt.Errorf("too few elements: %d (need at least 1)", len(v))
+	}
+	if len(v) == 1 {
+		return &Struct{ClassName: v[0]}, nil
 	}
 	return &Struct{ClassName: v[0], ServiceName: v[1]}, nil
 }
