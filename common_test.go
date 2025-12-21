@@ -272,3 +272,85 @@ func TestCommonStruct(t *testing.T) {
 	}
 	testSpec(t, mapFields["key3"])
 }
+
+// TestServiceValueWithStructInSpec tests that NewServiceValue can accept *Struct
+// directly as the second element in [2]any.
+func TestServiceValueWithStructInSpec(t *testing.T) {
+	// Create an inner struct
+	innerStruct, err := NewServiceStruct(
+		"InnerClass", map[string]any{
+			"EndString": []string{"Circle1", "service1"},
+			"EndList": [][]string{
+				{"Circle2", "service2"},
+				{"Circle3", "service3"},
+			},
+			"EndMap": map[string][]string{
+				"key1": {"Circle2", "service2"},
+				"key2": {"Circle3", "service3"},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Now use the struct directly in [2]any for NewServiceValue
+	sp, err := NewServiceStruct(
+		"Geo", map[string]any{
+			// Test single struct using [2]any with *Struct as second element
+			"TheMiddle": [2]any{"WrapperClass", innerStruct},
+			// Test list of structs using [][2]any with *Struct as second element
+			"TheMiddleList": [][2]any{
+				{"WrapperClass1", innerStruct},
+				{"WrapperClass2", innerStruct},
+			},
+			// Test map of structs using map[string][2]any with *Struct as second element
+			"TheMiddleMap": map[string][2]any{
+				"key1": {"WrapperClass1", innerStruct},
+				"key2": {"WrapperClass2", innerStruct},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fields := sp.GetFields()
+
+	// Verify TheMiddle field
+	middle := fields["TheMiddle"].GetSingleStruct()
+	if middle.ClassName != "WrapperClass" {
+		t.Errorf("expected ClassName 'WrapperClass', got %q", middle.ClassName)
+	}
+	// Verify that the inner struct's fields were copied
+	if middle.Fields == nil {
+		t.Error("expected Fields to be non-nil")
+	}
+	testSpec(t, middle)
+
+	// Verify TheMiddleList field
+	middleList := fields["TheMiddleList"].GetListStruct()
+	if len(middleList.ListFields) != 2 {
+		t.Errorf("expected 2 list items, got %d", len(middleList.ListFields))
+	}
+	if middleList.ListFields[0].ClassName != "WrapperClass1" {
+		t.Errorf("expected ClassName 'WrapperClass1', got %q", middleList.ListFields[0].ClassName)
+	}
+	testSpec(t, middleList.ListFields[0])
+	if middleList.ListFields[1].ClassName != "WrapperClass2" {
+		t.Errorf("expected ClassName 'WrapperClass2', got %q", middleList.ListFields[1].ClassName)
+	}
+	testSpec(t, middleList.ListFields[1])
+
+	// Verify TheMiddleMap field
+	middleMap := fields["TheMiddleMap"].GetMapStruct()
+	mapFields := middleMap.MapFields
+	if mapFields["key1"].ClassName != "WrapperClass1" {
+		t.Errorf("expected ClassName 'WrapperClass1', got %q", mapFields["key1"].ClassName)
+	}
+	testSpec(t, mapFields["key1"])
+	if mapFields["key2"].ClassName != "WrapperClass2" {
+		t.Errorf("expected ClassName 'WrapperClass2', got %q", mapFields["key2"].ClassName)
+	}
+	testSpec(t, mapFields["key2"])
+}

@@ -237,12 +237,13 @@ func NewStruct(className string, fieldSpecs ...map[string]any) (*Struct, error) 
 //
 // Parameters:
 //   - className: The class/object type identifier
-//   - v: Either a service name (string) or field specifications (map[string]any)
+//   - v: Either a service name (string), field specifications (map[string]any), or a Struct directly (*Struct)
 //
 // Examples:
 //
 //	NewServiceStruct("provider", "providerService")  // Delegate to providerService
 //	NewServiceStruct("config", map[string]any{...}) // With nested field specs
+//	NewServiceStruct("wrapper", existingStruct)     // Use existing Struct
 func NewServiceStruct(className string, v any) (*Struct, error) {
 	x := &Struct{ClassName: className}
 	if v == nil {
@@ -263,6 +264,10 @@ func NewServiceStruct(className string, v any) (*Struct, error) {
 				return nil, err
 			}
 		}
+	case *Struct:
+		// Use the provided Struct's fields and service name
+		x.Fields = t.Fields
+		x.ServiceName = t.ServiceName
 	default:
 		return nil, fmt.Errorf("invalid type for service struct: %T", v)
 	}
@@ -362,18 +367,18 @@ func newMap2Struct(specs map[[2]string][2]any) (*Map2Struct, error) {
 //
 // This is similar to NewValue but uses []string format for end-node structs:
 //
-//	╔═══════════════════════════╤══════════════════╤═════════════╤═════════════════╗
-//	║ Go type                   │ Conversion       │ First       │ Second          ║
-//	╠═══════════════════════════╪══════════════════╪═════════════╪═════════════════╣
-//	║ []string                  │ end SingleStruct │ class name  │ service name    ║
-//	║ [][]string                │ end ListStruct   │ class name  │ service name    ║
-//	║ map[string][]string       │ end MapStruct    │ class name  │ service name    ║
-//	║ map[[2]string][]string    │ end Map2Struct   │ class name  │ service name    ║
-//	║ [2]any                    │ SingleStruct     │ class name  │ field specs     ║
-//	║ [][2]any                  │ ListStruct       │ class name  │ field specs     ║
-//	║ map[string][2]any         │ MapStruct        │ class name  │ field specs     ║
-//	║ map[[2]string][2]any      │ Map2Struct       │ class name  │ field specs     ║
-//	╚═══════════════════════════╧══════════════════╧═════════════╧═════════════════╝
+//	╔═══════════════════════════╤══════════════════╤═════════════╤════════════════════════════╗
+//	║ Go type                   │ Conversion       │ First       │ Second                     ║
+//	╠═══════════════════════════╪══════════════════╪═════════════╪════════════════════════════╣
+//	║ []string                  │ end SingleStruct │ class name  │ service name               ║
+//	║ [][]string                │ end ListStruct   │ class name  │ service name               ║
+//	║ map[string][]string       │ end MapStruct    │ class name  │ service name               ║
+//	║ map[[2]string][]string    │ end Map2Struct   │ class name  │ service name               ║
+//	║ [2]any                    │ SingleStruct     │ class name  │ service/fields/*Struct     ║
+//	║ [][2]any                  │ ListStruct       │ class name  │ service/fields/*Struct     ║
+//	║ map[string][2]any         │ MapStruct        │ class name  │ service/fields/*Struct     ║
+//	║ map[[2]string][2]any      │ Map2Struct       │ class name  │ service/fields/*Struct     ║
+//	╚═══════════════════════════╧══════════════════╧═════════════╧════════════════════════════╝
 func NewServiceValue(v any) (*Value, error) {
 	switch t := v.(type) {
 	case []string:
@@ -451,8 +456,10 @@ func newServiceSingleStruct(spec typeSpec) (*Struct, error) {
 		return &Struct{ClassName: className, ServiceName: v}, nil
 	case map[string]any:
 		return NewServiceStruct(className, v)
+	case *Struct:
+		return NewServiceStruct(className, v)
 	default:
-		return nil, fmt.Errorf("field specifications must be map[string]any or string, got %T", spec[1])
+		return nil, fmt.Errorf("field specifications must be map[string]any, string, or *Struct, got %T", spec[1])
 	}
 }
 

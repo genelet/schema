@@ -230,10 +230,10 @@ Constructs a Value for service orchestration. Similar to NewValue but supports `
 | `[][]string` | end ListStruct | class name | service name |
 | `map[string][]string` | end MapStruct | class name | service name |
 | `map[[2]string][]string` | end Map2Struct | class name | service name |
-| `[2]any` | SingleStruct | class name | field specs or service |
-| `[][2]any` | ListStruct | class name | field specs or service |
-| `map[string][2]any` | MapStruct | class name | field specs or service |
-| `map[[2]string][2]any` | Map2Struct | class name | field specs or service |
+| `[2]any` | SingleStruct | class name | `string` (service), `map[string]any` (fields), or `*Struct` |
+| `[][2]any` | ListStruct | class name | `string` (service), `map[string]any` (fields), or `*Struct` |
+| `map[string][2]any` | MapStruct | class name | `string` (service), `map[string]any` (fields), or `*Struct` |
+| `map[[2]string][2]any` | Map2Struct | class name | `string` (service), `map[string]any` (fields), or `*Struct` |
 | `*Struct` | SingleStruct | - | - |
 | `[]*Struct` | ListStruct | - | - |
 | `map[string]*Struct` | MapStruct | - | - |
@@ -251,7 +251,10 @@ Constructs a Struct for service orchestration with ClassName and optional Servic
 
 **Parameters:**
 - `className` - The class/object type identifier
-- `v` - Either a service name (`string`) or field specifications (`map[string]any`)
+- `v` - Either:
+  - `string` - service name for delegation
+  - `map[string]any` - field specifications
+  - `*Struct` - existing Struct (fields and service name will be copied)
 
 **Examples:**
 ```go
@@ -262,6 +265,10 @@ spec, err := NewServiceStruct("Provider", "providerService")
 spec, err := NewServiceStruct("Config", map[string]any{
     "Database": []string{"PostgresDB", "dbService"},
 })
+
+// With existing Struct
+innerSpec, _ := NewServiceStruct("Inner", "innerService")
+spec, err := NewServiceStruct("Wrapper", innerSpec)
 ```
 
 ---
@@ -310,6 +317,33 @@ spec, _ := NewServiceStruct("Root", map[string]any{
     "Child": [2]any{"ChildType", map[string]any{
         "Grandchild": []string{"GrandchildType", "grandchildService"},
     }},
+})
+
+// Reusing pre-built Structs in [2]any
+// This allows you to define a Struct once and reuse it multiple times
+// with different wrapper class names, avoiding duplication
+innerSpec, _ := NewServiceStruct("InnerType", map[string]any{
+    "Field1": []string{"Type1", "service1"},
+    "Field2": []string{"Type2", "service2"},
+})
+
+// Use innerSpec directly in [2]any - the first element becomes the new className,
+// and the second element (innerSpec) provides the fields and service name
+spec, _ := NewServiceStruct("Root", map[string]any{
+    // Single struct with new className but reusing innerSpec's fields
+    "SingleField": [2]any{"WrapperClass", innerSpec},
+
+    // In lists
+    "ListField": [][2]any{
+        {"Wrapper1", innerSpec},
+        {"Wrapper2", innerSpec},
+    },
+
+    // In maps
+    "MapField": map[string][2]any{
+        "key1": {"Wrapper1", innerSpec},
+        "key2": {"Wrapper2", innerSpec},
+    },
 })
 ```
 
