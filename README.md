@@ -4,6 +4,8 @@
 
 Package `schema` provides unified protobuf-based data structures for describing hierarchical configuration schemas. It consolidates types from `horizon/utils`, `determined/det`, and `grand/spec` into a single shared definition.
 
+For a detailed guide on representing these structures using JSON Schema, see [JSON Schema Representation](JSON_SCHEMA.md).
+
 ## Overview
 
 The schema package defines types used across multiple packages for:

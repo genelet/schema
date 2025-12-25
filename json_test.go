@@ -31,6 +31,39 @@ func TestJSONString(t *testing.T) {
 		t.Errorf("%s", fields["TheMap888"].String())
 		t.Errorf("%s", fields["TheMap"].String())
 	}
+
+	// Verify JSMServiceStruct
+	jsonSchemaStr := `{
+		"type": "object",
+		"properties": {
+			"TheString888": { "type": "Circle" },
+			"TheString":    { "type": "Circle" },
+			"TheList888":   { "type": "array", "items": { "type": "CircleClass1" } },
+			"TheList":      { "type": "array", "items": { "type": "CircleClass1" } },
+			"TheMap888":    { "type": "object", "additionalProperties": { "type": "CircleClass1" } },
+			"TheMap":       { "type": "object", "additionalProperties": { "type": "CircleClass1" } }
+		}
+	}`
+	jsSpec, err := JSMServiceStruct("Geo", jsonSchemaStr)
+	if err != nil {
+		t.Errorf("JSMServiceStruct failed: %v", err)
+	}
+	jsFields := jsSpec.GetFields()
+
+	// String match
+	if jsFields["TheString888"].GetSingleStruct().ClassName != fields["TheString888"].GetSingleStruct().ClassName {
+		t.Errorf("TheString888 mismatch")
+	}
+
+	// List match (comparing type of first item)
+	if jsFields["TheList888"].GetListStruct().ListFields[0].ClassName != fields["TheList888"].GetListStruct().ListFields[0].ClassName {
+		t.Errorf("TheList888 item type mismatch")
+	}
+
+	// Map match (wildcard vs key "a1")
+	if jsFields["TheMap888"].GetMapStruct().MapFields["*"].ClassName != fields["TheMap888"].GetMapStruct().MapFields["a1"].ClassName {
+		t.Errorf("TheMap888 value type mismatch")
+	}
 }
 
 func TestJSONStruct(t *testing.T) {
@@ -67,6 +100,49 @@ func TestJSONStruct(t *testing.T) {
 		t.Errorf("shape spec: %s", shape2Endpoint.String())
 		t.Errorf("field 2 spec: %s", field2Endpoint.String())
 	}
+
+	// Verify JSMServiceStruct
+	jsonSchemaStr := `{
+		"type": "object",
+		"properties": {
+			"Shape1": {
+				"type": "Class1",
+				"properties": {
+					"Field1": { "type": "Circle1" }
+				}
+			},
+			"Shape2": {
+				"type": "Class2",
+				"properties": {
+					"Field2": { "type": "array", "items": { "type": "Circle2" } }
+				}
+			}
+		}
+	}`
+	jsSpec, err := JSMServiceStruct("Geo", jsonSchemaStr)
+	if err != nil {
+		t.Errorf("JSMServiceStruct failed: %v", err)
+	}
+	jsShapeFields := jsSpec.GetFields()
+
+	// Verify Shape1
+	jsShape1 := jsShapeFields["Shape1"].GetSingleStruct()
+	if jsShape1.ClassName != "Class1" {
+		t.Errorf("Shape1 class mismatch")
+	}
+	if jsShape1.Fields["Field1"].GetSingleStruct().ClassName != "Circle1" {
+		t.Errorf("Shape1 Field1 mismatch")
+	}
+
+	// Verify Shape2
+	jsShape2 := jsShapeFields["Shape2"].GetSingleStruct()
+	if jsShape2.ClassName != "Class2" {
+		t.Errorf("Shape2 class mismatch")
+	}
+	// Note: Manual test has mixed list ("Circle2", "Circle3"). JSMServiceStruct only validates against "Circle2" type.
+	if jsShape2.Fields["Field2"].GetListStruct().ListFields[0].ClassName != "Circle2" {
+		t.Errorf("Shape2 Field2 mismatch")
+	}
 }
 
 func TestJSONList(t *testing.T) {
@@ -90,6 +166,40 @@ func TestJSONList(t *testing.T) {
 		t.Errorf("shape spec: %s", shapeEndpoint.String())
 		t.Errorf("field 1 spec: %s", field1Endpoint.String())
 	}
+
+	// Verify JSMServiceStruct
+	// Manual test has heterogeneous list: Class2 (idx 0) and Class3 (idx 1).
+	// JSMServiceStruct assumes homogenous list. We will define schema for Class2 (the first item type logic, usually).
+	// BUT manual test specifically asserted on Index 1 (Class3)!
+	// "shapeEndpoint := shapeFields["ListShapes"].GetListStruct().GetListFields()[1]"
+	// So we should construct schema to match Class3 if we want to mimic the test's interest, OR stick to Class2.
+	// Since "List of T", typically T is uniform.
+	// Let's mimic the *List Structure*. The manual construction is `[][2]any`.
+	// I will generate schema for `Class2` and checking `Class2` since that's index 0.
+	jsonSchemaStr := `{
+		"type": "object",
+		"properties": {
+			"ListShapes": {
+				"type": "array",
+				"items": { 
+					"type": "Class2",
+					"properties": { "Field3": { "type": "Circle" } }
+				}
+			}
+		}
+	}`
+	jsSpec, err := JSMServiceStruct("Geo", jsonSchemaStr)
+	if err != nil {
+		t.Errorf("JSMServiceStruct failed: %v", err)
+	}
+	jsListShapes := jsSpec.GetFields()["ListShapes"].GetListStruct()
+	jsItem0 := jsListShapes.ListFields[0] // JSM produces 1 item definition
+	if jsItem0.ClassName != "Class2" {
+		t.Errorf("ListShapes item class mismatch")
+	}
+	if jsItem0.Fields["Field3"].GetSingleStruct().ClassName != "Circle" {
+		t.Errorf("ListShapes item field mismatch")
+	}
 }
 
 func TestJSONMap(t *testing.T) {
@@ -112,5 +222,31 @@ func TestJSONMap(t *testing.T) {
 		field1Endpoint.ClassName != "Circle" {
 		t.Errorf("shape spec: %s", shapeEndpoint.String())
 		t.Errorf("field 1 spec: %s", field1Endpoint.String())
+	}
+
+	// Verify JSMServiceStruct
+	jsonSchemaStr := `{
+		"type": "object",
+		"properties": {
+			"HashShapes": {
+				"type": "object",
+				"additionalProperties": {
+					"type": "Class5",
+					"properties": { "Field4": { "type": "Circle" } }
+				}
+			}
+		}
+	}`
+	jsSpec, err := JSMServiceStruct("Geo", jsonSchemaStr)
+	if err != nil {
+		t.Errorf("JSMServiceStruct failed: %v", err)
+	}
+	jsHashShapes := jsSpec.GetFields()["HashShapes"].GetMapStruct()
+	jsItem := jsHashShapes.MapFields["*"]
+	if jsItem.ClassName != "Class5" {
+		t.Errorf("HashShapes item class mismatch")
+	}
+	if jsItem.Fields["Field4"].GetSingleStruct().ClassName != "Circle" {
+		t.Errorf("HashShapes item field mismatch")
 	}
 }

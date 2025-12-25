@@ -8,11 +8,11 @@
     "Struct": {
       "type": "object",
       "properties": {
-        "object_name": {
+        "ClassName": {
           "type": "string",
           "description": "The name of the object/class this struct represents"
         },
-        "service_name": {
+        "ServiceName": {
           "type": "string",
           "description": "The name of the service to handle this struct"
         },
