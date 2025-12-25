@@ -243,6 +243,77 @@ s, err := JSMServiceStruct("GeoMap", jsonStr)
 // Result: Map2Struct with region "region1" -> key "key1" -> SingleStruct("Circle") served by "s_map2_val".
 ```
 
+#### Case 5: Mixed Fields with Services
+
+A struct containing various field types (simple, list, map), all backed by different services.
+
+```go
+jsonStr := `{
+    "type": "object",
+    "properties": {
+        "SimpleField": { "type": "Metric", "serviceName": "metric_service" },
+        "ListField":   { "type": "array", "items": { "type": "Log", "serviceName": "log_service" } },
+        "MapField":    { "type": "object", "additionalProperties": { "type": "Config", "serviceName": "config_service" } }
+    }
+}`
+```
+
+#### Case 6: Nested Structs with Services
+
+A struct where fields are themselves defined as structs (inline types), eventually leading to service-backed fields.
+
+```go
+jsonStr := `{
+    "type": "object",
+    "properties": {
+        "Group1": {
+            "type": "SubClass1",
+            "properties": {
+                "Item": { "type": "Detail", "serviceName": "s1" }
+            }
+        }
+    }
+}`
+```
+
+#### Case 7: List of Structs with Services
+
+A list where the item type is a complex object (defined by properties), which in turn contains service-backed fields.
+
+```go
+jsonStr := `{
+    "type": "object",
+    "properties": {
+        "Items": {
+            "type": "array",
+            "items": {
+                "type": "ItemClass",
+                "properties": { "Info": { "type": "Data", "serviceName": "data_service" } }
+            }
+        }
+    }
+}`
+```
+
+#### Case 8: Map of Structs with Services
+
+A map where the value type is a complex object, which contains service-backed fields.
+
+```go
+jsonStr := `{
+    "type": "object",
+    "properties": {
+        "Registry": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "EntryClass",
+                "properties": { "Record": { "type": "Row", "serviceName": "db_service" } }
+            }
+        }
+    }
+}`
+```
+
 ### `JSMStruct`
 
 `JSMStruct` is a wrapper around `JSMServiceStruct`. It parses the JSON Schema but **removes all `serviceName` fields** from the resulting `Struct` tree. This is useful when you need the data structure definition but want to decouple it from specific backend services (e.g., for client-side generation or pure data validation).
