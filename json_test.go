@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -34,14 +35,14 @@ func TestJSONString(t *testing.T) {
 
 	// Verify JSMServiceStruct
 	jsonSchemaStr := `{
-		"type": "object",
+		"className": "object",
 		"properties": {
-			"TheString888": { "type": "Circle" },
-			"TheString":    { "type": "Circle" },
-			"TheList888":   { "type": "array", "items": { "type": "CircleClass1" } },
-			"TheList":      { "type": "array", "items": { "type": "CircleClass1" } },
-			"TheMap888":    { "type": "object", "additionalProperties": { "type": "CircleClass1" } },
-			"TheMap":       { "type": "object", "additionalProperties": { "type": "CircleClass1" } }
+			"TheString888": { "className": "Circle", "serviceName": "s1" },
+			"TheString":    { "className": "Circle", "serviceName": "s2" },
+			"TheList888":   { "items": { "className": "CircleClass1", "serviceName": "s3" } },
+			"TheList":      { "items": { "className": "CircleClass1", "serviceName": "s4" } },
+			"TheMap888":    { "additionalProperties": { "className": "CircleClass1", "serviceName": "s5" } },
+			"TheMap":       { "additionalProperties": { "className": "CircleClass1", "serviceName": "s6" } }
 		}
 	}`
 	jsSpec, err := JSMServiceStruct("Geo", jsonSchemaStr)
@@ -81,14 +82,14 @@ func TestJSONString(t *testing.T) {
 	fieldsService := specService.GetFields()
 
 	jsonSchemaStrService := `{
-		"type": "object",
+		"className": "object",
 		"properties": {
-			"TheString888": { "type": "Circle", "serviceName": "s1" },
-			"TheString":    { "type": "Circle", "serviceName": "s2" },
-			"TheList888":   { "type": "array", "items": { "type": "CircleClass1", "serviceName": "s3" } },
-			"TheList":      { "type": "array", "items": { "type": "CircleClass1", "serviceName": "s5" } },
-			"TheMap888":    { "type": "object", "additionalProperties": { "type": "CircleClass1", "serviceName": "s7" } },
-			"TheMap":       { "type": "object", "additionalProperties": { "type": "CircleClass1", "serviceName": "s9" } }
+			"TheString888": { "className": "Circle", "serviceName": "s1" },
+			"TheString":    { "className": "Circle", "serviceName": "s2" },
+			"TheList888":   { "items": { "className": "CircleClass1", "serviceName": "s3" } },
+			"TheList":      { "items": { "className": "CircleClass1", "serviceName": "s5" } },
+			"TheMap888":    { "additionalProperties": { "className": "CircleClass1", "serviceName": "s7" } },
+			"TheMap":       { "additionalProperties": { "className": "CircleClass1", "serviceName": "s9" } }
 		}
 	}`
 	jsSpecService, err := JSMServiceStruct("Geo", jsonSchemaStrService)
@@ -146,18 +147,18 @@ func TestJSONStruct(t *testing.T) {
 
 	// Verify JSMServiceStruct
 	jsonSchemaStr := `{
-		"type": "object",
+		"className": "object",
 		"properties": {
 			"Shape1": {
-				"type": "Class1",
+				"className": "Class1",
 				"properties": {
-					"Field1": { "type": "Circle1" }
+					"Field1": { "className": "Circle1", "serviceName": "s1" }
 				}
 			},
 			"Shape2": {
-				"type": "Class2",
+				"className": "Class2",
 				"properties": {
-					"Field2": { "type": "array", "items": { "type": "Circle2" } }
+					"Field2": { "items": { "className": "Circle2", "serviceName": "s2" } }
 				}
 			}
 		}
@@ -201,18 +202,18 @@ func TestJSONStruct(t *testing.T) {
 	fieldsService := specService.GetFields()
 
 	jsonSchemaStrService := `{
-		"type": "object",
+		"className": "object",
 		"properties": {
 			"Shape1": {
-				"type": "Class1",
+				"className": "Class1",
 				"properties": {
-					"Field1": { "type": "Circle1", "serviceName": "s1" }
+					"Field1": { "className": "Circle1", "serviceName": "s1" }
 				}
 			},
 			"Shape2": {
-				"type": "Class2",
+				"className": "Class2",
 				"properties": {
-					"Field2": { "type": "array", "items": { "type": "Circle2", "serviceName": "s2" } }
+					"Field2": { "items": { "className": "Circle2", "serviceName": "s2" } }
 				}
 			}
 		}
@@ -269,13 +270,11 @@ func TestJSONList(t *testing.T) {
 	// Let's mimic the *List Structure*. The manual construction is `[][2]any`.
 	// I will generate schema for `Class2` and checking `Class2` since that's index 0.
 	jsonSchemaStr := `{
-		"type": "object",
 		"properties": {
 			"ListShapes": {
-				"type": "array",
 				"items": { 
-					"type": "Class2",
-					"properties": { "Field3": { "type": "Circle" } }
+					"className": "Class2",
+					"properties": { "Field3": { "className": "Circle", "serviceName": "s1" } }
 				}
 			}
 		}
@@ -307,13 +306,11 @@ func TestJSONList(t *testing.T) {
 	fieldsService := specService.GetFields()
 
 	jsonSchemaStrService := `{
-		"type": "object",
 		"properties": {
 			"ListShapes": {
-				"type": "array",
 				"items": { 
-					"type": "Class2",
-					"properties": { "Field3": { "type": "Circle", "serviceName": "s3" } }
+					"className": "Class2",
+					"properties": { "Field3": { "className": "Circle", "serviceName": "s3" } }
 				}
 			}
 		}
@@ -360,13 +357,11 @@ func TestJSONMap(t *testing.T) {
 
 	// Verify JSMServiceStruct
 	jsonSchemaStr := `{
-		"type": "object",
 		"properties": {
 			"HashShapes": {
-				"type": "object",
 				"additionalProperties": {
-					"type": "Class5",
-					"properties": { "Field4": { "type": "Circle" } }
+					"className": "Class5",
+					"properties": { "Field4": { "className": "Circle", "serviceName": "s1" } }
 				}
 			}
 		}
@@ -397,13 +392,11 @@ func TestJSONMap(t *testing.T) {
 	fieldsService := specService.GetFields()
 
 	jsonSchemaStrService := `{
-		"type": "object",
 		"properties": {
 			"HashShapes": {
-				"type": "object",
 				"additionalProperties": {
-					"type": "Class5",
-					"properties": { "Field4": { "type": "Circle", "serviceName": "s1" } }
+					"className": "Class5",
+					"properties": { "Field4": { "className": "Circle", "serviceName": "s1" } }
 				}
 			}
 		}
@@ -420,5 +413,103 @@ func TestJSONMap(t *testing.T) {
 
 	if jsItemService.Fields["Field4"].GetSingleStruct().ServiceName != manualItemX1.Fields["Field4"].GetSingleStruct().ServiceName {
 		t.Errorf("HashShapes item field service mismatch")
+	}
+}
+
+func TestStruct_MarshalJSON_RoundTrip(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialStruct *Struct
+	}{
+		{
+			name: "Simple SingleStruct",
+			initialStruct: &Struct{
+				ClassName: "Person",
+				Fields: map[string]*Value{
+					"Name": {Kind: &Value_SingleStruct{SingleStruct: &Struct{ClassName: "MyString"}}},
+				},
+			},
+		},
+		{
+			name: "Struct with Service",
+			initialStruct: &Struct{
+				ClassName:   "Person",
+				ServiceName: "userService",
+				Fields: map[string]*Value{
+					"Avatar": {Kind: &Value_SingleStruct{SingleStruct: &Struct{ClassName: "Image", ServiceName: "imgService"}}},
+				},
+			},
+		},
+		{
+			name: "ListStruct",
+			initialStruct: &Struct{
+				ClassName: "Group",
+				Fields: map[string]*Value{
+					"Members": {Kind: &Value_ListStruct{ListStruct: &ListStruct{
+						ListFields: []*Struct{{ClassName: "Person"}},
+					}}},
+				},
+			},
+		},
+		{
+			name: "MapStruct",
+			initialStruct: &Struct{
+				ClassName: "Registry",
+				Fields: map[string]*Value{
+					"Entries": {Kind: &Value_MapStruct{MapStruct: &MapStruct{
+						MapFields: map[string]*Struct{"*": {ClassName: "Entry"}},
+					}}},
+				},
+			},
+		},
+		{
+			name: "Map2Struct",
+			initialStruct: &Struct{
+				ClassName: "GeoMap",
+				Fields: map[string]*Value{
+					"Grid": {Kind: &Value_Map2Struct{Map2Struct: &Map2Struct{
+						Map2Fields: map[string]*MapStruct{
+							"region1": {MapFields: map[string]*Struct{
+								"keyA": {ClassName: "Point", ServiceName: "s1"},
+							}},
+						},
+					}}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 1. Marshal to JSON
+			data, err := json.MarshalIndent(tt.initialStruct, "", "  ")
+			if err != nil {
+				t.Fatalf("Marshal failed: %v", err)
+			}
+			t.Logf("Marshaled JSON:\n%s", string(data))
+
+			// 2. Unmarshal back
+			var restored Struct
+			if err := json.Unmarshal(data, &restored); err != nil {
+				t.Fatalf("Unmarshal failed: %v", err)
+			}
+
+			// 3. Compare
+			// Note: We need a deep compare.
+			// However, initialStruct might be slightly different structurally from restored
+			// if we omitted fields that are nil. But here we constructed them carefully.
+			// One catch: MapStruct keys. initialStruct has "*". Restored has "*".
+			// Map2Struct keys are preserved.
+			if restored.ClassName != tt.initialStruct.ClassName {
+				t.Errorf("ClassName mismatch: got %q, want %q", restored.ClassName, tt.initialStruct.ClassName)
+			}
+			if restored.ServiceName != tt.initialStruct.ServiceName {
+				t.Errorf("ServiceName mismatch: got %q, want %q", restored.ServiceName, tt.initialStruct.ServiceName)
+			}
+			// Checking fields existence roughly
+			if len(restored.Fields) != len(tt.initialStruct.Fields) {
+				t.Errorf("Fields count mismatch: got %d, want %d", len(restored.Fields), len(tt.initialStruct.Fields))
+			}
+		})
 	}
 }

@@ -15,10 +15,9 @@ func TestJSMServiceStruct(t *testing.T) {
 			name:      "Simple Object",
 			className: "Person",
 			jsonSchema: `{
-				"type": "object",
 				"properties": {
-					"name": { "type": "string" },
-					"age": { "type": "integer" }
+					"name": { "className": "MyString" },
+					"age": { "className": "MyInteger" }
 				}
 			}`,
 			check: func(t *testing.T, s *Struct) {
@@ -28,11 +27,11 @@ func TestJSMServiceStruct(t *testing.T) {
 				if len(s.Fields) != 2 {
 					t.Errorf("expected 2 fields, got %d", len(s.Fields))
 				}
-				if s.Fields["name"].GetSingleStruct().ClassName != "string" {
-					t.Errorf("expected name to be string")
+				if s.Fields["name"].GetSingleStruct().ClassName != "MyString" {
+					t.Errorf("expected name to be MyString")
 				}
-				if s.Fields["age"].GetSingleStruct().ClassName != "integer" {
-					t.Errorf("expected age to be integer")
+				if s.Fields["age"].GetSingleStruct().ClassName != "MyInteger" {
+					t.Errorf("expected age to be MyInteger")
 				}
 			},
 		},
@@ -40,12 +39,10 @@ func TestJSMServiceStruct(t *testing.T) {
 			name:      "Nested Object",
 			className: "Container",
 			jsonSchema: `{
-				"type": "object",
 				"properties": {
 					"child": {
-						"type": "object",
 						"properties": {
-							"val": { "type": "string" }
+							"val": { "className": "MyString" }
 						}
 					}
 				}
@@ -55,8 +52,8 @@ func TestJSMServiceStruct(t *testing.T) {
 				if child == nil {
 					t.Fatal("child is nil")
 				}
-				if child.Fields["val"].GetSingleStruct().ClassName != "string" {
-					t.Errorf("expected val to be string")
+				if child.Fields["val"].GetSingleStruct().ClassName != "MyString" {
+					t.Errorf("expected val to be MyString")
 				}
 			},
 		},
@@ -64,11 +61,9 @@ func TestJSMServiceStruct(t *testing.T) {
 			name:      "Array of Strings",
 			className: "TagList",
 			jsonSchema: `{
-				"type": "object",
 				"properties": {
 					"tags": {
-						"type": "array",
-						"items": { "type": "string" }
+						"items": { "className": "MyString" }
 					}
 				}
 			}`,
@@ -81,8 +76,8 @@ func TestJSMServiceStruct(t *testing.T) {
 				if len(tags.ListFields) != 1 {
 					t.Errorf("expected 1 item in ListStruct describing the type, got %d", len(tags.ListFields))
 				}
-				if tags.ListFields[0].ClassName != "string" {
-					t.Errorf("expected item type string")
+				if tags.ListFields[0].ClassName != "MyString" {
+					t.Errorf("expected item type MyString")
 				}
 			},
 		},
@@ -90,12 +85,10 @@ func TestJSMServiceStruct(t *testing.T) {
 			name:      "Object with Map Field",
 			className: "ContainerWithMap",
 			jsonSchema: `{
-				"type": "object",
 				"properties": {
 					"myMap": {
-						"type": "object",
 						"additionalProperties": {
-							"type": "integer"
+							"className": "MyInteger"
 						}
 					}
 				}
@@ -115,8 +108,8 @@ func TestJSMServiceStruct(t *testing.T) {
 				if elem == nil {
 					t.Fatal("expected wildcard '*' key in MapStruct")
 				}
-				if elem.ClassName != "integer" {
-					t.Errorf("expected value type integer, got %s", elem.ClassName)
+				if elem.ClassName != "MyInteger" {
+					t.Errorf("expected value type MyInteger, got %s", elem.ClassName)
 				}
 			},
 		},
@@ -136,7 +129,7 @@ func TestJSMServiceStruct(t *testing.T) {
 func TestJSMServiceStructWithService(t *testing.T) {
 	className := "MyClass"
 	serviceName := "MyService"
-	jsonSchemaStr := `{"type": "string", "serviceName": "MyService"}`
+	jsonSchemaStr := `{"className": "MyString", "serviceName": "MyService"}`
 
 	s, err := JSMServiceStruct(className, jsonSchemaStr)
 	if err != nil {
@@ -154,23 +147,19 @@ func TestJSMServiceStructWithService(t *testing.T) {
 func TestJSMServiceStruct_Map2(t *testing.T) {
 	className := "Map2Container"
 	jsonSchemaStr := `{
-		"type": "object",
 		"properties": {
 			"myMap2": {
-				"type": "object",
 				"x-map2": true,
 				"properties": {
 					"region1": {
-						"type": "object",
 						"properties": {
-							"key1": { "type": "ServiceA" },
-							"key2": { "type": "ServiceB" }
+							"key1": { "className": "ServiceA" },
+							"key2": { "className": "ServiceB" }
 						}
 					},
 					"region2": {
-						"type": "object",
 						"properties": {
-							"key3": { "type": "ServiceC" }
+							"key3": { "className": "ServiceC" }
 						}
 					}
 				}
@@ -208,6 +197,10 @@ func TestJSMServiceStruct_Map2(t *testing.T) {
 	if r1.MapFields["key1"].ClassName != "ServiceA" {
 		t.Errorf("expected ServiceA, got %s", r1.MapFields["key1"].ClassName)
 	}
+	// check service name
+	if r1.MapFields["key1"].ServiceName != "" {
+		t.Errorf("expected empty ServiceName, got %q", r1.MapFields["key1"].ServiceName)
+	}
 	if r1.MapFields["key2"].ClassName != "ServiceB" {
 		t.Errorf("expected ServiceB, got %s", r1.MapFields["key2"].ClassName)
 	}
@@ -229,9 +222,8 @@ func TestJSMStruct(t *testing.T) {
 	className := "NoServiceClass"
 	// Schema with serviceName
 	jsonSchemaStr := `{
-		"type": "object",
 		"properties": {
-			"f1": { "type": "string", "serviceName": "shouldBeGone" }
+			"f1": { "className": "MyString", "serviceName": "shouldBeGone" }
 		}
 	}`
 
@@ -248,8 +240,8 @@ func TestJSMStruct(t *testing.T) {
 	}
 
 	f1 := s.Fields["f1"].GetSingleStruct()
-	if f1.ClassName != "string" {
-		t.Errorf("expected string class, got %s", f1.ClassName)
+	if f1.ClassName != "MyString" {
+		t.Errorf("expected MyString class, got %s", f1.ClassName)
 	}
 	if f1.ServiceName != "" {
 		t.Errorf("expected empty nested ServiceName, got %s", f1.ServiceName)

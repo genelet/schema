@@ -1,5 +1,5 @@
 // Package schema provides unified data structures for describing hierarchical configuration schemas.
-// It defines protobuf-based types (Struct, Value, ListStruct, MapStruct, Map2Struct)
+// It defines schema types (Struct, Value, ListStruct, MapStruct, Map2Struct)
 // that are used across multiple packages for:
 //   - Dynamic HCL/JSON unmarshaling (using ClassName for type lookup)
 //   - Service orchestration (using ClassName and ServiceName for delegation)
@@ -30,7 +30,7 @@ func createTypeSpec(className string, fields ...map[string]any) typeSpec {
 
 // NewValue constructs a Value from a generic Go interface.
 //
-// This function converts Go types into the protobuf-based Value structure
+// This function converts Go types into the Value structure
 // that describes interface field types for dynamic unmarshaling.
 //
 // Conversion rules:

@@ -2,7 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/genelet/schema?status.svg)](https://godoc.org/github.com/genelet/schema)
 
-Package `schema` provides unified protobuf-based data structures for describing hierarchical configuration schemas. It consolidates types from `horizon/utils`, `determined/det`, and `grand/spec` into a single shared definition.
+Package `schema` provides unified data structures for describing hierarchical configuration schemas. It consolidates types from `horizon/utils`, `determined/det`, and `grand/spec` into a single shared definition.
 
 For a detailed guide on representing these structures using JSON Schema, see [JSON Schema Representation](JSON_SCHEMA.md).
 
@@ -19,23 +19,17 @@ The schema package defines types used across multiple packages for:
 go get github.com/genelet/schema
 ```
 
-## Dependencies
+## Schema Types
 
-- `google.golang.org/protobuf` - Protocol Buffers runtime
-
----
-
-## Protobuf Types
-
-All types are defined in `proto/schema.proto` and generated into Go code.
+All types are defined in Go code.
 
 ### Struct
 
-```protobuf
-message Struct {
-  string ClassName = 1;
-  string ServiceName = 2;
-  map<string, Value> fields = 3;
+```go
+type Struct struct {
+  ClassName   string            // Go struct type name / object identifier
+  ServiceName string            // Service name for delegation
+  Fields      map[string]*Value // Nested field specifications
 }
 ```
 
@@ -57,21 +51,15 @@ Represents a type specification for dynamic unmarshaling and service orchestrati
 | `GetObjectName() string` | Alias for GetClassName (backwards compatibility) |
 | `Reset()` | Resets the struct to zero value |
 | `String() string` | Returns string representation |
-| `ProtoMessage()` | Marker method for protobuf |
-| `ProtoReflect() protoreflect.Message` | Returns protobuf reflection interface |
+| `String() string` | Returns string representation |
 
 ---
 
 ### Value
 
-```protobuf
-message Value {
-  oneof kind {
-    Struct single_struct = 1;
-    ListStruct list_struct = 2;
-    MapStruct map_struct = 3;
-    Map2Struct map2_struct = 4;
-  }
+```go
+type Value struct {
+  Kind isValue_Kind // One of SingleStruct, ListStruct, MapStruct, Map2Struct
 }
 ```
 
@@ -100,9 +88,9 @@ Represents a typed field specification. It can be one of four kinds.
 
 ### ListStruct
 
-```protobuf
-message ListStruct {
-  repeated Struct list_fields = 1;
+```go
+type ListStruct struct {
+  ListFields []*Struct
 }
 ```
 
@@ -122,9 +110,9 @@ Represents a list/slice of Struct specifications.
 
 ### MapStruct
 
-```protobuf
-message MapStruct {
-  map<string, Struct> map_fields = 1;
+```go
+type MapStruct struct {
+  MapFields map[string]*Struct
 }
 ```
 
@@ -144,9 +132,9 @@ Represents a map with string keys to Struct specifications.
 
 ### Map2Struct
 
-```protobuf
-message Map2Struct {
-  map<string, MapStruct> map2_fields = 1;
+```go
+type Map2Struct struct {
+  Map2Fields map[string]*MapStruct
 }
 ```
 
@@ -366,6 +354,40 @@ specs := []*Struct{
 value, _ := NewValue(specs)
 ```
 
+### JSON Marshaling
+
+The `Struct` type implements `json.Marshaler` and `json.Unmarshaler`, allowing it to be serialized to and from the simplified JSON Schema format described in [JSON Schema Representation](JSON_SCHEMA.md).
+
+```go
+// Create a Struct
+spec, _ := NewStruct("Person", map[string]any{
+    "Name": "String",
+    "Age":  "Integer",
+})
+
+// Marshal to JSON Schema
+data, _ := json.MarshalIndent(spec, "", "  ")
+fmt.Println(string(data))
+// Output:
+// {
+//   "className": "Person",
+//   "properties": {
+//     "Name": { "className": "String" },
+//     "Age": { "className": "Integer" }
+//   }
+// }
+
+// Unmarshal from JSON Schema
+var newSpec schema.Struct
+jsonStr := `{
+    "className": "Person",
+    "properties": {
+        "Name": { "className": "String" }
+    }
+}`
+json.Unmarshal([]byte(jsonStr), &newSpec)
+```
+
 ---
 
 ## Package Aliases
@@ -387,10 +409,4 @@ var NewStruct = schema.NewStruct
 
 ---
 
-## Regenerating Protobuf Code
 
-```bash
-cd ~/schema
-protoc --go_out=. --go_opt=paths=source_relative proto/schema.proto
-mv proto/schema.pb.go schema.pb.go
-```

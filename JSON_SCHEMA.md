@@ -2,89 +2,102 @@
 
 The `schema` package allows you to define Genelet Schema types (`Struct`, `ListStruct`, `MapStruct`, `Map2Struct`) using standard JSON Schema (Draft-7) with minimal extensions. This document details how different JSON Schema structures map to their corresponding Genelet Schema types.
 
+## Philosophy: Minimal Schema
+
+**You do not need to provide a full JSON Schema.**
+
+The purpose of this package is to assist in two specific scenarios during unmarshalling/marshaling:
+1.  **Interface Types**: Go requires knowing the concrete implementation to unmarshal into an Interface field.
+2.  **Service Injection**: Specifying which microservice allows access to a specific field.
+
+**Standard primitive fields** (e.g., `string`, `int`, `bool`, `float`) and standard structs **do not need to be included** in the schema. You should omit them entirely.
+
+**Rule of Thumb**: Only include a field in the JSON Schema if:
+*   It is an **Interface** type (requires a concrete `className` definition).
+*   It needs a `serviceName` annotation.
+*   It is a nested structure (Array/Map/Object) that *contains* one of the above.
+
 ## Overview
 
-The mapping logic is primarily driven by the structural keywords present in the JSON Schema:
+The mapping logic keywords:
 
 | JSON Schema Keyword | Genelet Schema Type | Description |
 |---------------------|---------------------|-------------|
 | `properties` | **SingleStruct** | A single object with known fields. |
-| `items` | **ListStruct** | A list of objects of the same type. |
-| `additionalProperties` | **MapStruct** | A map with string keys and values of the same type. |
+| `items` | **ListStruct** | A list of objects of the same schema. |
+| `additionalProperties` | **MapStruct** | A map with string keys and values of the same schema. |
 | `x-map2` (extension) | **Map2Struct** | A map of maps (two-layer keys). |
-| `type` (primitive) | **SingleStruct** | A "primitive" or "leaf" type (e.g., `string`, `integer`, `MyClass`). |
+| `className` (custom) | **SingleStruct** | A custom class (e.g., `MyClass`) used to implement an Interface. |
 
 ## 1. SingleStruct (Struct)
 
-A `SingleStruct` represents a typed object, potentially with nested fields.
+A `SingleStruct` represents an object with a class name, potentially with nested fields.
 
 ### Explicit Object with Properties
-Use `type: "object"` and `properties` to define a struct with fields. The `type` field in the JSON schema corresponds to `ClassName`. If `type` is "object", the resulting `ClassName` might be empty or inferred (depending on function used), or you can provide a custom string for `type` to set the `ClassName`.
+Use `properties` to define a struct that contains Interface fields.
 
 **JSON Schema:**
 ```json
 {
-  "type": "Person",
+  "className": "Person",
   "properties": {
-    "Name": { "type": "string" },
-    "Age": { "type": "integer" }
+    "Avatar": { "className": "Image", "serviceName": "s1" }
   }
 }
 ```
+*Note: Fields like `Name` (string) or `Age` (int) are omitted.*
 
 **Resulting Schema Type:** `SingleStruct`
-- ClassName: "Person"
-- Fields: "Name" (SingleStruct "string"), "Age" (SingleStruct "integer")
+- ClassName: "Person" (Implicitly an object because of `properties`)
+- Fields: "Avatar" (SingleStruct "Image" with Service "s1")
 
-### Leaf Node / Primitive
-A schema with just a `type` string (and optional `serviceName`) is treated as a `SingleStruct` leaf node.
+### Leaf Node (Interface Implementation)
+A schema with a **custom className** string is treated as a `SingleStruct` leaf node. This tells the parser what concrete class to use for an Interface field.
 
 **JSON Schema:**
 ```json
 {
-  "type": "string"
+  "className": "MyConcreteType"
 }
 ```
 **Resulting Schema Type:** `SingleStruct`
-- ClassName: "string"
+- ClassName: "MyConcreteType"
 
 ## 2. ListStruct
 
 A `ListStruct` represents an array or slice of items. It corresponds to `[]T` in Go.
 
-Use `type: "array"` and `items` to define the element type.
+Use `items` to define the element schema. `items` implies it is an array.
 
 **JSON Schema:**
 ```json
 {
-  "type": "array",
   "items": {
-    "type": "Person"
+    "className": "Person"
   }
 }
 ```
 
 **Resulting Schema Type:** `ListStruct`
-- ListFields: `[SingleStruct("Person")]` (describes the element type)
+- ListFields: `[SingleStruct("Person")]` (describes the element schema)
 
 ## 3. MapStruct
 
 A `MapStruct` represents a map with string keys. It corresponds to `map[string]T` in Go.
 
-Use `type: "object"` and `additionalProperties` to define the value type.
+Use `additionalProperties` to define the value schema. `additionalProperties` implies it is a map.
 
 **JSON Schema:**
 ```json
 {
-  "type": "object",
   "additionalProperties": {
-    "type": "Person"
+    "className": "Person"
   }
 }
 ```
 
 **Resulting Schema Type:** `MapStruct`
-- MapFields: `{"*": SingleStruct("Person")}` (wildcard key describing value type)
+- MapFields: `{"*": SingleStruct("Person")}` (wildcard key describing value schema)
 
 ## 4. Map2Struct
 
@@ -95,20 +108,17 @@ To represent this structure, use the custom extension `x-map2: true`. The struct
 **JSON Schema:**
 ```json
 {
-  "type": "object",
   "x-map2": true,
   "properties": {
     "region1": {
-      "type": "object",
       "properties": {
-        "key1": { "type": "ServiceA" },
-        "key2": { "type": "ServiceB" }
+        "key1": { "className": "ServiceA" },
+        "key2": { "className": "ServiceB" }
       }
     },
     "region2": {
-      "type": "object",
       "properties": {
-        "key3": { "type": "ServiceC" }
+        "key3": { "className": "ServiceC" }
       }
     }
   }
@@ -130,11 +140,11 @@ The `serviceName` keyword can be added to any schema node to specify the service
 **JSON Schema:**
 ```json
 {
-  "type": "UserProfile",
+  "className": "UserProfile",
   "serviceName": "userService",
   "properties": {
     "Avatar": {
-      "type": "Image",
+      "className": "Image",
       "serviceName": "mediaService"
     }
   }
@@ -157,7 +167,7 @@ func JSMServiceStruct(className, jsonSchemaStr string) (*Struct, error)
 
 **Arguments:**
 
-*   `className` (string): The name assigned to the root object (SingleStruct). Even if the JSON Schema defines a `type` name, this argument takes precedence for the root.
+*   `className` (string): The name assigned to the root object (SingleStruct). Even if the JSON Schema defines a `className` field, this argument takes precedence for the root.
 *   `jsonSchemaStr` (string): The standard JSON Schema (Draft-7) string to parse.
 
 **Conversion Rules:**
@@ -166,11 +176,11 @@ The following table summarizes how different JSON Schema structures are converte
 
 | JSON Schema Pattern | Genelet Type | ClassName | ServiceName |
 | :--- | :--- | :--- | :--- |
-| `{"type": "Circle", "serviceName": "s1"}` | **SingleStruct** | "Circle" | "s1" |
-| `{"type": "array", "items": {"type": "Circle", "serviceName": "s2"}}` | **ListStruct** | n/a | n/a (field level) |
-| `{"type": "object", "additionalProperties": {"type": "Circle", "serviceName": "s3"}}` | **MapStruct** | n/a | n/a (field level) |
-| `{"type": "Class1", "properties": {"Field1": {"type": "Circle"}}}` | **SingleStruct** | "Class1" | "" |
-| `{"type": "object", "x-map2": true, "properties": ...}` | **Map2Struct** | n/a | n/a |
+| `{"className": "Circle", "serviceName": "s1"}` | **SingleStruct** | "Circle" | "s1" |
+| `{"items": {"className": "Circle", "serviceName": "s2"}}` | **ListStruct** | n/a | n/a (field level) |
+| `{"additionalProperties": {"className": "Circle", "serviceName": "s3"}}` | **MapStruct** | n/a | n/a (field level) |
+| `{"className": "Class1", "properties": {"Field1": {"className": "Circle"}}}` | **SingleStruct** | "Class1" | "" |
+| `{"x-map2": true, "properties": ...}` | **Map2Struct** | n/a | n/a |
 
 **Examples:**
 
@@ -180,14 +190,14 @@ Defining a `Geo` object with a string field and a primitive type field.
 
 ```go
 jsonStr := `{
-    "type": "Geo",
+    "className": "Geo",
     "properties": {
-        "Name": { "type": "string" },
-        "Shape": { "type": "Circle", "serviceName": "s_shape" }
+        "Shape": { "className": "Circle", "serviceName": "s_shape" }
     }
 }`
 s, err := JSMServiceStruct("Geo", jsonStr)
 // Result: SingleStruct "Geo". Field "Shape" is SingleStruct("Circle") served by "s_shape".
+// Note: "Name" field (string) is omitted from this schema.
 ```
 
 #### Case 2: List (ListStruct)
@@ -196,9 +206,8 @@ Defining a list of `Circle` objects.
 
 ```go
 jsonStr := `{
-    "type": "array",
     "items": {
-        "type": "Circle",
+        "className": "Circle",
         "serviceName": "s_list_item"
     }
 }`
@@ -212,9 +221,8 @@ Defining a map where keys are strings and values are `Circle` objects.
 
 ```go
 jsonStr := `{
-    "type": "object",
     "additionalProperties": {
-        "type": "Circle",
+        "className": "Circle",
         "serviceName": "s_map_val"
     }
 }`
@@ -228,13 +236,11 @@ Defining a two-level map using the `x-map2` extension.
 
 ```go
 jsonStr := `{
-    "type": "object",
     "x-map2": true,
     "properties": {
         "region1": {
-            "type": "object",
             "properties": {
-                "key1": { "type": "Circle", "serviceName": "s_map2_val" }
+                "key1": { "className": "Circle", "serviceName": "s_map2_val" }
             }
         }
     }
@@ -249,11 +255,10 @@ A struct containing various field types (simple, list, map), all backed by diffe
 
 ```go
 jsonStr := `{
-    "type": "object",
     "properties": {
-        "SimpleField": { "type": "Metric", "serviceName": "metric_service" },
-        "ListField":   { "type": "array", "items": { "type": "Log", "serviceName": "log_service" } },
-        "MapField":    { "type": "object", "additionalProperties": { "type": "Config", "serviceName": "config_service" } }
+        "SimpleField": { "className": "Metric", "serviceName": "metric_service" },
+        "ListField":   { "items": { "className": "Log", "serviceName": "log_service" } },
+        "MapField":    { "additionalProperties": { "className": "Config", "serviceName": "config_service" } }
     }
 }`
 ```
@@ -264,12 +269,11 @@ A struct where fields are themselves defined as structs (inline types), eventual
 
 ```go
 jsonStr := `{
-    "type": "object",
     "properties": {
         "Group1": {
-            "type": "SubClass1",
+            "className": "SubClass1",
             "properties": {
-                "Item": { "type": "Detail", "serviceName": "s1" }
+                "Item": { "className": "Detail", "serviceName": "s1" }
             }
         }
     }
@@ -282,13 +286,11 @@ A list where the item type is a complex object (defined by properties), which in
 
 ```go
 jsonStr := `{
-    "type": "object",
     "properties": {
         "Items": {
-            "type": "array",
             "items": {
-                "type": "ItemClass",
-                "properties": { "Info": { "type": "Data", "serviceName": "data_service" } }
+                "className": "ItemClass",
+                "properties": { "Info": { "className": "Data", "serviceName": "data_service" } }
             }
         }
     }
@@ -301,13 +303,11 @@ A map where the value type is a complex object, which contains service-backed fi
 
 ```go
 jsonStr := `{
-    "type": "object",
     "properties": {
         "Registry": {
-            "type": "object",
             "additionalProperties": {
-                "type": "EntryClass",
-                "properties": { "Record": { "type": "Row", "serviceName": "db_service" } }
+                "className": "EntryClass",
+                "properties": { "Record": { "className": "Row", "serviceName": "db_service" } }
             }
         }
     }
@@ -326,11 +326,8 @@ func JSMStruct(className, jsonSchemaStr string) (*Struct, error)
 
 ```go
 jsonStr := `{
-    "type": "Circle",
-    "serviceName": "geometryService",
-    "properties": {
-        "Radius": { "type": "integer" }
-    }
+    "className": "Circle",
+    "serviceName": "geometryService"
 }`
 
 // Using JSMServiceStruct

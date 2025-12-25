@@ -7,7 +7,7 @@ import (
 
 // jsonSchema represents a subset of JSON Schema for parsing.
 type jsonSchema struct {
-	Type                 string                 `json:"type"`
+	ClassName            string                 `json:"className"`
 	Properties           map[string]*jsonSchema `json:"properties"`
 	Items                *jsonSchema            `json:"items"`
 	AdditionalProperties *jsonSchema            `json:"additionalProperties"`
@@ -19,10 +19,10 @@ type jsonSchema struct {
 // JSMServiceStruct creates a Struct from a JSON Schema string.
 //
 // converting Standard JSON Schema to Genelet Schema Struct:
-//   - type: object, properties -> Struct (SingleStruct)
-//   - type: array, items -> ListStruct
-//   - type: object, additionalProperties -> MapStruct
-//   - primitive types (string, integer, etc.) -> SingleStruct with ClassName = type
+//   - className: object (optional), properties -> Struct (SingleStruct)
+//   - className: array (optional), items -> ListStruct
+//   - className: object (optional), additionalProperties -> MapStruct
+//   - custom className (MyClass) -> SingleStruct with ClassName = MyClass
 //
 // Arguments:
 //   - className: The name of the root object.
@@ -30,17 +30,17 @@ type jsonSchema struct {
 //
 // Examples of jsonSchemaStr (parallel to NewServiceValue rules):
 //
-//	╔════════════════════════════════════════════════════════════════════════════════════════════════╤══════════════════╤═════════════╤════════════════════════════╗
-//	║ JSON Schema                                                                                    │ Conversion       │ ClassName   │ ServiceName                ║
-//	╠════════════════════════════════════════════════════════════════════════════════════════════════╪══════════════════╪═════════════╪════════════════════════════╣
-//	║ {"type": "Circle", "serviceName": "s1"}                                                        │ SingleStruct     │ "Circle"    │ "s1"                       ║
-//	║ {"type": "array", "items": {"type": "Circle", "serviceName": "s2"}}                            │ ListStruct       │ n/a         │ n/a                        ║
-//	║ {"type": "object", "additionalProperties": {"type": "Circle", "serviceName": "s3"}}            │ MapStruct        │ n/a         │ n/a                        ║
-//	║ {"type": "Class1", "properties": {"Field1": {"type": "Circle"}}}                               │ SingleStruct     │ "Class1"    │ ""                         ║
-//	║ {"type": "array", "items": {"type": "Class2", "properties": {"Field2": {"type": "Circle"}}}}   │ ListStruct       │ n/a         │ n/a                        ║
-//	║ {"type": "object", "additionalProperties": {"type": "Class3", "properties": {...}}}            │ MapStruct        │ n/a         │ n/a                        ║
-//	║ {"type": "object", "x-map2": true, "properties": {"r1": {"properties": {"k1": T}}}}           │ Map2Struct       │ n/a         │ n/a                        ║
-//	╚════════════════════════════════════════════════════════════════════════════════════════════════╧══════════════════╧═════════════╧════════════════════════════╝
+//	╔══════════════════════════════════════════════════════════════════════════════════════════════════════╤══════════════════╤═════════════╤════════════════════════════╗
+//	║ JSON Schema                                                                                          │ Conversion       │ ClassName   │ ServiceName                ║
+//	╠══════════════════════════════════════════════════════════════════════════════════════════════════════╪══════════════════╪═════════════╪════════════════════════════╣
+//	║ {"className": "Circle", "serviceName": "s1"}                                                         │ SingleStruct     │ "Circle"    │ "s1"                       ║
+//	║ {"className": "array", "items": {"className": "Circle", "serviceName": "s2"}}                        │ ListStruct       │ n/a         │ n/a                        ║
+//	║ {"className": "object", "additionalProperties": {"className": "Circle", "serviceName": "s3"}}        │ MapStruct        │ n/a         │ n/a                        ║
+//	║ {"className": "Class1", "properties": {"Field1": {"className": "Circle"}}}                           │ SingleStruct     │ "Class1"    │ ""                         ║
+//	║ {"className": "array", "items": {"className": "Class2", "properties": {...}}}                        │ ListStruct       │ n/a         │ n/a                        ║
+//	║ {"className": "object", "additionalProperties": {"className": "Class3", "properties": {...}}}        │ MapStruct        │ n/a         │ n/a                        ║
+//	║ {"className": "object", "x-map2": true, "properties": {"r1": {"properties": {"k1": T}}}}             │ Map2Struct       │ n/a         │ n/a                        ║
+//	╚══════════════════════════════════════════════════════════════════════════════════════════════════════╧══════════════════╧═════════════╧════════════════════════════╝
 func JSMServiceStruct(className, jsonSchemaStr string) (*Struct, error) {
 	if className == "" {
 		return nil, fmt.Errorf("className cannot be empty")
@@ -54,6 +54,12 @@ func JSMServiceStruct(className, jsonSchemaStr string) (*Struct, error) {
 	value, err := convertSchemaToValue(&schema)
 	if err != nil {
 		return nil, err
+	}
+	if value == nil {
+		// If the top-level schema is a primitive, we return an empty Struct with the ClassName.
+		// This is debatable, but returning nil might break callers expecting a Struct.
+		// Better to return an empty struct than nil.
+		return &Struct{ClassName: className}, nil
 	}
 
 	if s := value.GetSingleStruct(); s != nil {
@@ -70,17 +76,17 @@ func JSMServiceStruct(className, jsonSchemaStr string) (*Struct, error) {
 //
 // Examples of jsonSchemaStr (parallel to NewStruct rules):
 //
-//	╔════════════════════════════════════════════════════════════════════════════════════════════════╤══════════════════╤═════════════╗
-//	║ JSON Schema                                                                                    │ Conversion       │ ClassName   ║
-//	╠════════════════════════════════════════════════════════════════════════════════════════════════╪══════════════════╪═════════════╣
-//	║ {"type": "Circle"}                                                                             │ SingleStruct     │ "Circle"    ║
-//	║ {"type": "array", "items": {"type": "Circle"}}                                                 │ ListStruct       │ n/a         ║
-//	║ {"type": "object", "additionalProperties": {"type": "Circle"}}                                 │ MapStruct        │ n/a         ║
-//	║ {"type": "object", "x-map2": true, "properties": {"r1": {"properties": {"k1": T}}}}           │ Map2Struct       │ n/a         ║
-//	║ {"type": "Class1", "properties": {"Field1": {"type": "Circle"}}}                               │ SingleStruct     │ "Class1"    ║
-//	║ {"type": "array", "items": {"type": "Class2", "properties": {"Field2": {"type": "Circle"}}}}   │ ListStruct       │ n/a         ║
-//	║ {"type": "object", "additionalProperties": {"type": "Class3", "properties": {...}}}            │ MapStruct        │ n/a         ║
-//	╚════════════════════════════════════════════════════════════════════════════════════════════════╧══════════════════╧═════════════╝
+//	╔══════════════════════════════════════════════════════════════════════════════════════════════════════╤══════════════════╤═════════════╗
+//	║ JSON Schema                                                                                          │ Conversion       │ ClassName   ║
+//	╠══════════════════════════════════════════════════════════════════════════════════════════════════════╪══════════════════╪═════════════╣
+//	║ {"className": "Circle"}                                                                              │ SingleStruct     │ "Circle"    ║
+//	║ {"className": "array", "items": {"className": "Circle"}}                                             │ ListStruct       │ n/a         ║
+//	║ {"className": "object", "additionalProperties": {"className": "Circle"}}                             │ MapStruct        │ n/a         ║
+//	║ {"className": "object", "x-map2": true, "properties": {"r1": {"properties": {"k1": T}}}}             │ Map2Struct       │ n/a         ║
+//	║ {"className": "Class1", "properties": {"Field1": {"className": "Circle"}}}                           │ SingleStruct     │ "Class1"    ║
+//	║ {"className": "array", "items": {"className": "Class2", "properties": {...}}}                        │ ListStruct       │ n/a         ║
+//	║ {"className": "object", "additionalProperties": {"className": "Class3", "properties": {...}}}        │ MapStruct        │ n/a         ║
+//	╚══════════════════════════════════════════════════════════════════════════════════════════════════════╧══════════════════╧═════════════╝
 func JSMStruct(className, jsonSchemaStr string) (*Struct, error) {
 	s, err := JSMServiceStruct(className, jsonSchemaStr)
 	if err != nil {
@@ -112,15 +118,22 @@ func convertSchemaToValue(js *jsonSchema) (*Value, error) {
 				if err != nil {
 					return nil, fmt.Errorf("in x-map2 region %q key %q: %w", regionKey, innerKey, err)
 				}
+				if val == nil {
+					continue // Ignore primitives in map2
+				}
 				innerMapFields[innerKey] = extractStructFromValue(val)
 			}
-			map2Fields[regionKey] = &MapStruct{MapFields: innerMapFields}
+			if len(innerMapFields) > 0 {
+				map2Fields[regionKey] = &MapStruct{MapFields: innerMapFields}
+			}
+		}
+		if len(map2Fields) == 0 {
+			return nil, nil // If all fields were ignored
 		}
 		return &Value{Kind: &Value_Map2Struct{Map2Struct: &Map2Struct{Map2Fields: map2Fields}}}, nil
 	}
 
 	// 1. If "properties" is present, it is a Struct (SingleStruct).
-	// We allow custom "type" to specify ClassName.
 	if js.Properties != nil {
 		fields := make(map[string]*Value)
 		for name, prop := range js.Properties {
@@ -128,11 +141,13 @@ func convertSchemaToValue(js *jsonSchema) (*Value, error) {
 			if err != nil {
 				return nil, fmt.Errorf("in property %q: %w", name, err)
 			}
-			fields[name] = val
+			if val != nil {
+				fields[name] = val
+			}
 		}
 		s := &Struct{Fields: fields, ServiceName: js.ServiceName}
-		if js.Type != "object" {
-			s.ClassName = js.Type
+		if js.ClassName != "" {
+			s.ClassName = js.ClassName
 		}
 		return &Value{Kind: &Value_SingleStruct{SingleStruct: s}}, nil
 	}
@@ -142,6 +157,9 @@ func convertSchemaToValue(js *jsonSchema) (*Value, error) {
 		val, err := convertSchemaToValue(js.AdditionalProperties)
 		if err != nil {
 			return nil, err
+		}
+		if val == nil {
+			return nil, nil // Ignore Map of primitives
 		}
 		targetStruct := extractStructFromValue(val)
 		return &Value{Kind: &Value_MapStruct{MapStruct: &MapStruct{MapFields: map[string]*Struct{"*": targetStruct}}}}, nil
@@ -153,23 +171,17 @@ func convertSchemaToValue(js *jsonSchema) (*Value, error) {
 		if err != nil {
 			return nil, err
 		}
+		if itemVal == nil {
+			return nil, nil // Ignore List of primitives
+		}
 		itemStruct := extractStructFromValue(itemVal)
 		return &Value{Kind: &Value_ListStruct{ListStruct: &ListStruct{ListFields: []*Struct{itemStruct}}}}, nil
 	}
 
-	// 4. Fallback: Primitive or Empty Object
-	// If type is "array", but no items, return empty ListStruct
-	if js.Type == "array" {
-		return &Value{Kind: &Value_ListStruct{ListStruct: &ListStruct{}}}, nil
-	}
-
-	// If type is "object", return empty Struct
-	if js.Type == "object" {
-		return &Value{Kind: &Value_SingleStruct{SingleStruct: &Struct{ServiceName: js.ServiceName}}}, nil
-	}
-
-	// Otherwise, treating as primitive/opaque class with ClassName = type
-	return &Value{Kind: &Value_SingleStruct{SingleStruct: &Struct{ClassName: js.Type, ServiceName: js.ServiceName}}}, nil
+	// 4. Custom Class / Leaf
+	// Treating as CUSTOM CLASS (opaque class with ClassName = type)
+	// This captures "MyType".
+	return &Value{Kind: &Value_SingleStruct{SingleStruct: &Struct{ClassName: js.ClassName, ServiceName: js.ServiceName}}}, nil
 }
 
 // extractStructFromValue attempts to get a Struct from a Value.
@@ -189,4 +201,152 @@ func extractStructFromValue(v *Value) *Struct {
 	// But simplistically, if we just want to avoid panic/nil, return a placeholder.
 	// In strict mode we might error.
 	return &Struct{ClassName: "WrappedComplexType"}
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+// It converts the Struct into the Genelet JSON Schema format.
+func (s *Struct) MarshalJSON() ([]byte, error) {
+	js, err := convertStructToSchema(s)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(js)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+// It parses the Genelet JSON Schema format into the Struct.
+func (s *Struct) UnmarshalJSON(data []byte) error {
+	var js jsonSchema
+	if err := json.Unmarshal(data, &js); err != nil {
+		return err
+	}
+
+	val, err := convertSchemaToValue(&js)
+	if err != nil {
+		return err
+	}
+	if val == nil {
+		// Empty struct if primitive/ignored
+		s.ClassName = js.ClassName
+		s.ServiceName = js.ServiceName
+		s.Fields = nil
+		return nil
+	}
+
+	// Extract the single struct from the value
+	extracted := extractStructFromValue(val)
+	s.ClassName = extracted.ClassName
+	s.ServiceName = extracted.ServiceName
+	s.Fields = extracted.Fields
+
+	// If the top-level schema had a class name, ensure it's preserved
+	// (extractStructFromValue might return a wrapper or missing name if it came from non-SingleStruct)
+	if js.ClassName != "" {
+		s.ClassName = js.ClassName
+	}
+	// Same for ServiceName
+	if js.ServiceName != "" {
+		s.ServiceName = js.ServiceName
+	}
+
+	return nil
+}
+
+func convertStructToSchema(s *Struct) (*jsonSchema, error) {
+	if s == nil {
+		return nil, nil
+	}
+	js := &jsonSchema{
+		ClassName:   s.ClassName,
+		ServiceName: s.ServiceName,
+	}
+
+	if len(s.Fields) > 0 {
+		js.Properties = make(map[string]*jsonSchema)
+		for name, val := range s.Fields {
+			propJs, err := convertValueToSchema(val)
+			if err != nil {
+				return nil, fmt.Errorf("field %q: %w", name, err)
+			}
+			if propJs != nil {
+				js.Properties[name] = propJs
+			}
+		}
+	}
+	return js, nil
+}
+
+func convertValueToSchema(v *Value) (*jsonSchema, error) {
+	if v == nil {
+		return nil, nil
+	}
+
+	switch k := v.Kind.(type) {
+	case *Value_SingleStruct:
+		return convertStructToSchema(k.SingleStruct)
+
+	case *Value_ListStruct:
+		// ListStruct: items -> schema of first element
+		ls := k.ListStruct
+		if len(ls.ListFields) == 0 {
+			// Empty list, cannot determine item schema.
+			// Return empty schema or error?
+			// Return schema with empty items to indicate array type but unknown element.
+			return &jsonSchema{Items: &jsonSchema{}}, nil
+		}
+		itemJs, err := convertStructToSchema(ls.ListFields[0])
+		if err != nil {
+			return nil, err
+		}
+		return &jsonSchema{Items: itemJs}, nil
+
+	case *Value_MapStruct:
+		// MapStruct: additionalProperties -> schema of "*" element
+		ms := k.MapStruct
+		if len(ms.MapFields) == 0 {
+			return &jsonSchema{AdditionalProperties: &jsonSchema{}}, nil
+		}
+		// Look for "*" key specifically? Or just pick one?
+		// JSMServiceStruct uses "*" as the key for values.
+		// If constructed manually, might be specific keys.
+		// We maintain the "MapStruct = Map of T" semantic.
+		// If "*" exists, use it. Else pick any (assuming homogeneity).
+		var target *Struct
+		if s, ok := ms.MapFields["*"]; ok {
+			target = s
+		} else {
+			// iter and pick first
+			for _, s := range ms.MapFields {
+				target = s
+				break
+			}
+		}
+		valJs, err := convertStructToSchema(target)
+		if err != nil {
+			return nil, err
+		}
+		return &jsonSchema{AdditionalProperties: valJs}, nil
+
+	case *Value_Map2Struct:
+		// Map2Struct: x-map2: true, Nested properties
+		m2s := k.Map2Struct
+		js := &jsonSchema{XMap2: true, Properties: make(map[string]*jsonSchema)}
+		for regionName, mapStruct := range m2s.Map2Fields {
+			// Each value in Map2Fields is a MapStruct
+			// This MapStruct contains the inner keys -> Structs
+			innerProps := make(map[string]*jsonSchema)
+			for innerKey, innerStruct := range mapStruct.MapFields {
+				innerJs, err := convertStructToSchema(innerStruct)
+				if err != nil {
+					return nil, err
+				}
+				innerProps[innerKey] = innerJs
+			}
+			js.Properties[regionName] = &jsonSchema{Properties: innerProps}
+		}
+		return js, nil
+
+	default:
+		return nil, fmt.Errorf("unknown Value kind: %T", v.Kind)
+	}
 }
