@@ -183,11 +183,11 @@ jsonStr := `{
     "type": "Geo",
     "properties": {
         "Name": { "type": "string" },
-        "Shape": { "type": "Circle" }
+        "Shape": { "type": "Circle", "serviceName": "s_shape" }
     }
 }`
 s, err := JSMServiceStruct("Geo", jsonStr)
-// Result: SingleStruct "Geo" with fields "Name" (string) and "Shape" (Circle).
+// Result: SingleStruct "Geo". Field "Shape" is SingleStruct("Circle") served by "s_shape".
 ```
 
 #### Case 2: List (ListStruct)
@@ -199,11 +199,11 @@ jsonStr := `{
     "type": "array",
     "items": {
         "type": "Circle",
-        "serviceName": "geometryService"
+        "serviceName": "s_list_item"
     }
 }`
 s, err := JSMServiceStruct("CircleList", jsonStr)
-// Result: ListStruct where items are SingleStruct("Circle") served by "geometryService".
+// Result: ListStruct where items are SingleStruct("Circle") served by "s_list_item".
 ```
 
 #### Case 3: Map (MapStruct)
@@ -214,11 +214,12 @@ Defining a map where keys are strings and values are `Circle` objects.
 jsonStr := `{
     "type": "object",
     "additionalProperties": {
-        "type": "Circle"
+        "type": "Circle",
+        "serviceName": "s_map_val"
     }
 }`
 s, err := JSMServiceStruct("CircleMap", jsonStr)
-// Result: MapStruct where values are SingleStruct("Circle").
+// Result: MapStruct where values are SingleStruct("Circle") served by "s_map_val".
 ```
 
 #### Case 4: Map2 (Map2Struct)
@@ -233,13 +234,13 @@ jsonStr := `{
         "region1": {
             "type": "object",
             "properties": {
-                "key1": { "type": "Circle" }
+                "key1": { "type": "Circle", "serviceName": "s_map2_val" }
             }
         }
     }
 }`
 s, err := JSMServiceStruct("GeoMap", jsonStr)
-// Result: Map2Struct with region "region1" -> key "key1" -> SingleStruct("Circle").
+// Result: Map2Struct with region "region1" -> key "key1" -> SingleStruct("Circle") served by "s_map2_val".
 ```
 
 ### `JSMStruct`

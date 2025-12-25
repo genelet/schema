@@ -64,6 +64,49 @@ func TestJSONString(t *testing.T) {
 	if jsFields["TheMap888"].GetMapStruct().MapFields["*"].ClassName != fields["TheMap888"].GetMapStruct().MapFields["a1"].ClassName {
 		t.Errorf("TheMap888 value type mismatch")
 	}
+	// Verify NewServiceStruct with ServiceName
+	specService, err := NewServiceStruct(
+		"Geo", map[string]any{
+			"TheString888": []string{"Circle", "s1"},
+			"TheString":    []string{"Circle", "s2"},
+			"TheList888":   [][]string{{"CircleClass1", "s3"}, {"CircleClass2", "s4"}},
+			"TheList":      [][]string{{"CircleClass1", "s5"}, {"CircleClass2", "s6"}},
+			"TheMap888":    map[string][]string{"a1": {"CircleClass1", "s7"}, "a2": {"CircleClass2", "s8"}},
+			"TheMap":       map[string][]string{"a1": {"CircleClass1", "s9"}, "a2": {"CircleClass2", "s10"}},
+		},
+	)
+	if err != nil {
+		t.Errorf("NewServiceStruct failed: %v", err)
+	}
+	fieldsService := specService.GetFields()
+
+	jsonSchemaStrService := `{
+		"type": "object",
+		"properties": {
+			"TheString888": { "type": "Circle", "serviceName": "s1" },
+			"TheString":    { "type": "Circle", "serviceName": "s2" },
+			"TheList888":   { "type": "array", "items": { "type": "CircleClass1", "serviceName": "s3" } },
+			"TheList":      { "type": "array", "items": { "type": "CircleClass1", "serviceName": "s5" } },
+			"TheMap888":    { "type": "object", "additionalProperties": { "type": "CircleClass1", "serviceName": "s7" } },
+			"TheMap":       { "type": "object", "additionalProperties": { "type": "CircleClass1", "serviceName": "s9" } }
+		}
+	}`
+	jsSpecService, err := JSMServiceStruct("Geo", jsonSchemaStrService)
+	if err != nil {
+		t.Errorf("JSMServiceStruct failed: %v", err)
+	}
+	jsFieldsService := jsSpecService.GetFields()
+
+	// Verify ServiceName matches
+	if jsFieldsService["TheString888"].GetSingleStruct().ServiceName != fieldsService["TheString888"].GetSingleStruct().ServiceName {
+		t.Errorf("TheString888 service mismatch")
+	}
+	if jsFieldsService["TheList888"].GetListStruct().ListFields[0].ServiceName != fieldsService["TheList888"].GetListStruct().ListFields[0].ServiceName {
+		t.Errorf("TheList888 service mismatch")
+	}
+	if jsFieldsService["TheMap888"].GetMapStruct().MapFields["*"].ServiceName != fieldsService["TheMap888"].GetMapStruct().MapFields["a1"].ServiceName {
+		t.Errorf("TheMap888 service mismatch")
+	}
 }
 
 func TestJSONStruct(t *testing.T) {
@@ -143,6 +186,55 @@ func TestJSONStruct(t *testing.T) {
 	if jsShape2.Fields["Field2"].GetListStruct().ListFields[0].ClassName != "Circle2" {
 		t.Errorf("Shape2 Field2 mismatch")
 	}
+	// Verify NewServiceStruct with ServiceName
+	specService, err := NewServiceStruct(
+		"Geo", map[string]any{
+			"Shape1": [2]any{
+				"Class1", map[string]any{"Field1": []string{"Circle1", "s1"}}},
+			"Shape2": [2]any{
+				"Class2", map[string]any{"Field2": [][]string{{"Circle2", "s2"}, {"Circle3", "s3"}}}},
+		},
+	)
+	if err != nil {
+		t.Errorf("NewServiceStruct failed: %v", err)
+	}
+	fieldsService := specService.GetFields()
+
+	jsonSchemaStrService := `{
+		"type": "object",
+		"properties": {
+			"Shape1": {
+				"type": "Class1",
+				"properties": {
+					"Field1": { "type": "Circle1", "serviceName": "s1" }
+				}
+			},
+			"Shape2": {
+				"type": "Class2",
+				"properties": {
+					"Field2": { "type": "array", "items": { "type": "Circle2", "serviceName": "s2" } }
+				}
+			}
+		}
+	}`
+	jsSpecService, err := JSMServiceStruct("Geo", jsonSchemaStrService)
+	if err != nil {
+		t.Errorf("JSMServiceStruct failed: %v", err)
+	}
+	jsFieldsService := jsSpecService.GetFields()
+
+	// Verify Shape1 Field1 ServiceName
+	if jsFieldsService["Shape1"].GetSingleStruct().Fields["Field1"].GetSingleStruct().ServiceName !=
+		fieldsService["Shape1"].GetSingleStruct().Fields["Field1"].GetSingleStruct().ServiceName {
+		t.Errorf("Shape1 Field1 service mismatch")
+	}
+
+	// Verify Shape2 Field2 ServiceName
+	// Note: manual struct list has specific items, schema has generic item. checking first item.
+	if jsFieldsService["Shape2"].GetSingleStruct().Fields["Field2"].GetListStruct().ListFields[0].ServiceName !=
+		fieldsService["Shape2"].GetSingleStruct().Fields["Field2"].GetListStruct().ListFields[0].ServiceName {
+		t.Errorf("Shape2 Field2 service mismatch")
+	}
 }
 
 func TestJSONList(t *testing.T) {
@@ -200,6 +292,48 @@ func TestJSONList(t *testing.T) {
 	if jsItem0.Fields["Field3"].GetSingleStruct().ClassName != "Circle" {
 		t.Errorf("ListShapes item field mismatch")
 	}
+	// Verify NewServiceStruct with ServiceName
+	// Constructing a list of specs where each item has fields with service names
+	specService, err := NewServiceStruct(
+		"Geo", map[string]any{
+			"ListShapes": [][2]any{
+				{"Class2", map[string]any{"Field3": []string{"Circle", "s3"}}},
+				{"Class3", map[string]any{"Field5": []string{"Circle", "s5"}}}},
+		},
+	)
+	if err != nil {
+		t.Errorf("NewServiceStruct failed: %v", err)
+	}
+	fieldsService := specService.GetFields()
+
+	jsonSchemaStrService := `{
+		"type": "object",
+		"properties": {
+			"ListShapes": {
+				"type": "array",
+				"items": { 
+					"type": "Class2",
+					"properties": { "Field3": { "type": "Circle", "serviceName": "s3" } }
+				}
+			}
+		}
+	}`
+	// Note: Schema assumes homogenous list (Class2). Manual list has Class2 then Class3.
+	// We check if the FIRST item (Class2) matches the schema prediction for Class2.
+
+	jsSpecService, err := JSMServiceStruct("Geo", jsonSchemaStrService)
+	if err != nil {
+		t.Errorf("JSMServiceStruct failed: %v", err)
+	}
+	jsListShapesService := jsSpecService.GetFields()["ListShapes"].GetListStruct()
+	jsItem0Service := jsListShapesService.ListFields[0]
+
+	manualListShapes := fieldsService["ListShapes"].GetListStruct()
+	manualItem0 := manualListShapes.ListFields[0]
+
+	if jsItem0Service.Fields["Field3"].GetSingleStruct().ServiceName != manualItem0.Fields["Field3"].GetSingleStruct().ServiceName {
+		t.Errorf("ListShapes item field service mismatch")
+	}
 }
 
 func TestJSONMap(t *testing.T) {
@@ -248,5 +382,43 @@ func TestJSONMap(t *testing.T) {
 	}
 	if jsItem.Fields["Field4"].GetSingleStruct().ClassName != "Circle" {
 		t.Errorf("HashShapes item field mismatch")
+	}
+	// Verify NewServiceStruct with ServiceName
+	specService, err := NewServiceStruct(
+		"Geo", map[string]any{
+			"HashShapes": map[string][2]any{
+				"x1": {"Class5", map[string]any{"Field4": []string{"Circle", "s1"}}},
+				"y1": {"Class6", map[string]any{"Field5": []string{"Circle", "s2"}}}},
+		},
+	)
+	if err != nil {
+		t.Errorf("NewServiceStruct failed: %v", err)
+	}
+	fieldsService := specService.GetFields()
+
+	jsonSchemaStrService := `{
+		"type": "object",
+		"properties": {
+			"HashShapes": {
+				"type": "object",
+				"additionalProperties": {
+					"type": "Class5",
+					"properties": { "Field4": { "type": "Circle", "serviceName": "s1" } }
+				}
+			}
+		}
+	}`
+	jsSpecService, err := JSMServiceStruct("Geo", jsonSchemaStrService)
+	if err != nil {
+		t.Errorf("JSMServiceStruct failed: %v", err)
+	}
+	jsHashShapesService := jsSpecService.GetFields()["HashShapes"].GetMapStruct()
+	jsItemService := jsHashShapesService.MapFields["*"]
+
+	manualHashShapes := fieldsService["HashShapes"].GetMapStruct()
+	manualItemX1 := manualHashShapes.MapFields["x1"]
+
+	if jsItemService.Fields["Field4"].GetSingleStruct().ServiceName != manualItemX1.Fields["Field4"].GetSingleStruct().ServiceName {
+		t.Errorf("HashShapes item field service mismatch")
 	}
 }
