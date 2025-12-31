@@ -8,7 +8,380 @@ What if you have a JSON Schema (or a similar description) and you need to constr
 
 Enter [**`genelet/schema`**](https://github.com/genelet/schema).
 
-## The Missing Link
+## Chapter 1. Overview
+
+The schema package defines types used across multiple packages for:
+
+- **Dynamic HCL/JSON unmarshaling**: Using `ClassName` for type lookup when unmarshaling into interface fields
+- **Service orchestration**: Using `ClassName` and `ServiceName` for delegating read/write operations to microservices
+
+### Installation
+
+```bash
+go get github.com/genelet/schema
+```
+
+## Chapter 2. Philosophy: Minimal Schema
+
+**You do not need to provide a full JSON Schema.**
+
+The purpose of this package is to assist in two specific scenarios during unmarshalling/marshaling:
+1.  **Interface Types**: Go requires knowing the concrete implementation to unmarshal into an Interface field.
+2.  **Service Injection**: Specifying which microservice allows access to a specific field.
+
+**Standard primitive fields** (e.g., `string`, `int`, `bool`, `float`), `structs`, `slices` and `maps` **do not need to be included** in the schema. You should omit them entirely.
+
+**Rule of Thumb**: Only include a field in the JSON Schema if:
+*   It is an **Interface** type (requires a concrete `className` definition).
+*   It needs a `serviceName` annotation.
+*   It is a nested structure (Array/Map/Object) that *contains* one of the above.
+
+---
+
+## Chapter 3. Schema Types
+
+All types are defined in Go code.
+
+### Struct
+
+```go
+type Struct struct {
+  ClassName   string            // Go struct type name / object identifier
+  ServiceName string            // Service name for delegation
+  Fields      map[string]*Value // Nested field specifications
+}
+```
+
+Represents a type specification for dynamic unmarshaling and service orchestration.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ClassName` | `string` | Go struct type name / object identifier |
+| `ServiceName` | `string` | Service name for delegation (read/write operations) |
+| `Fields` | `map[string]*Value` | Nested field specifications |
+
+
+---
+
+### Value
+
+```go
+type Value struct {
+  Kind isValue_Kind // One of SingleStruct, ListStruct, MapStruct, Map2Struct
+}
+```
+
+Represents a typed field specification. It can be one of four kinds.
+
+**Oneof Wrapper Types:**
+
+| Type | Description |
+|------|-------------|
+| `Value_SingleStruct` | Wraps a single `*Struct` |
+| `Value_ListStruct` | Wraps a `*ListStruct` |
+| `Value_MapStruct` | Wraps a `*MapStruct` |
+| `Value_Map2Struct` | Wraps a `*Map2Struct` |
+
+---
+
+### ListStruct
+
+```go
+type ListStruct struct {
+  ListFields []*Struct
+}
+```
+
+Represents a list/slice of Struct specifications. Corresponds to `[]T` in Go.
+
+---
+
+### MapStruct
+
+```go
+type MapStruct struct {
+  MapFields map[string]*Struct
+}
+```
+
+Represents a map with string keys to Struct specifications. Corresponds to `map[string]T` in Go.
+
+---
+
+### Map2Struct
+
+```go
+type Map2Struct struct {
+  Map2Fields map[string]*MapStruct
+}
+```
+
+Represents a two-level nested map structure for `map[[2]string]T` types. The outer map uses the first key, the inner MapStruct uses the second key.
+
+---
+
+## Chapter 4. JSON Schema Representation
+
+The package uses JSON Schema (Draft-7) with minimal extensions for defining types.
+
+### Overview Table
+
+| JSON Schema Keyword | Genelet Schema Type | Description |
+|---------------------|---------------------|-------------|
+| `properties` | **SingleStruct** | A single object with known fields. |
+| `items` | **ListStruct** | A list of objects of the same schema. |
+| `additionalProperties` | **MapStruct** | A map with string keys and values of the same schema. |
+| `x-map2` (extension) | **Map2Struct** | A map of maps (two-layer keys). |
+| `className` (custom) | **SingleStruct** | A custom class used to implement an Interface. |
+
+### SingleStruct Examples
+
+**Explicit Object with Properties:**
+```json
+{
+  "className": "Person",
+  "properties": {
+    "Avatar": { "className": "Image", "serviceName": "s1" }
+  }
+}
+```
+
+**Leaf Node (Interface Implementation):**
+```json
+{
+  "className": "MyConcreteType"
+}
+```
+
+### ListStruct Example
+
+```json
+{
+  "items": {
+    "className": "Person"
+  }
+}
+```
+
+### MapStruct Example
+
+```json
+{
+  "additionalProperties": {
+    "className": "Person"
+  }
+}
+```
+
+### Map2Struct Example
+
+```json
+{
+  "x-map2": true,
+  "properties": {
+    "region1": {
+      "properties": {
+        "key1": { "className": "ServiceA" },
+        "key2": { "className": "ServiceB" }
+      }
+    }
+  }
+}
+``` 
+
+### Example: Mixed Fields with Services
+```go
+jsonStr := `{
+    "properties": {
+        "SimpleField": { "className": "Metric", "serviceName": "metric_service" },
+        "ListField":   { "items": { "className": "Log", "serviceName": "log_service" } },
+        "MapField":    { "additionalProperties": { "className": "Config", "serviceName": "config_service" } }
+    }
+}`
+```
+
+### Example: Nested Structs with Services
+```go
+jsonStr := `{
+    "properties": {
+        "Group1": {
+            "className": "SubClass1",
+            "properties": {
+                "Item": { "className": "Detail", "serviceName": "s1" }
+            }
+        }
+    }
+}`
+```
+
+### Example: List of Structs with Services
+```go
+jsonStr := `{
+    "properties": {
+        "Items": {
+            "items": {
+                "className": "ItemClass",
+                "properties": { "Info": { "className": "Data", "serviceName": "data_service" } }
+            }
+        }
+    }
+}`
+```
+
+### Example: Map of Structs with Services
+```go
+jsonStr := `{
+    "properties": {
+        "Registry": {
+            "additionalProperties": {
+                "className": "EntryClass",
+                "properties": { "Record": { "className": "Row", "serviceName": "db_service" } }
+            }
+        }
+    }
+}`
+```
+
+---
+
+## Chapter 5. Exported Functions
+
+### NewStruct
+
+```go
+func NewStruct(className string, fieldSpecs ...map[string]any) (*Struct, error)
+```
+
+Constructs a Struct specification for dynamic type unmarshaling.
+
+**Parameters:**
+- `className` - The Go struct type name (must be non-empty)
+- `fieldSpecs` - Optional map specifying field types (field name → type specification)
+
+**Example:**
+```go
+spec, err := NewStruct("Geo", map[string]any{
+    "Shape": "Circle",  // Shape field should be a Circle
+})
+```
+
+**Use Cases:**
+
+1. **Dynamic JSON Interface Unmarshaling** - Used in [github.com/genelet/determined](https://github.com/genelet/determined) for JSON unmarshaling. See the [Medium article](https://github.com/genelet/determined) for details.
+
+2. **Dynamic HCL Interface Unmarshaling** - Used in [github.com/genelet/horizon](https://github.com/genelet/horizon) for HCL unmarshaling. See the [Medium article: Marshal and Unmarshal HCL Files](https://medium.com/@peterbi_91340/marshal-and-unmarshal-hcl-files-1-3-d7591259a8d6) for details.
+
+---
+
+### NewValue
+
+```go
+func NewValue(v any) (*Value, error)
+```
+
+Constructs a Value from a generic Go interface. Used for dynamic HCL/JSON unmarshaling.
+
+> **Note:** Don't use this function directly. It is exported for readers to understand how the `v any` parameter is passed to `NewStruct`.
+
+**Conversion Rules:**
+
+| Go Type | Conversion |
+|---------|------------|
+| `string` | SingleStruct (class name only) |
+| `[]string` | ListStruct |
+| `map[string]string` | MapStruct |
+| `map[[2]string]string` | Map2Struct |
+| `*Struct` | SingleStruct |
+| `[]*Struct` | ListStruct |
+| `map[string]*Struct` | MapStruct |
+
+---
+
+### NewServiceStruct
+
+```go
+func NewServiceStruct(className string, v any) (*Struct, error)
+```
+
+Constructs a Struct for service orchestration with ClassName and optional ServiceName.
+
+**Parameters:**
+- `className` - The class/object type identifier
+- `v` - Either:
+  - `string` - service name for delegation
+  - `map[string]any` - field specifications
+
+**Examples:**
+```go
+// With service delegation
+spec, err := NewServiceStruct("Provider", "providerService")
+
+// With nested field specs
+spec, err := NewServiceStruct("Config", map[string]any{
+    "Database": []string{"PostgresDB", "dbService"},
+})
+```
+
+**Use Case:**
+
+This function is used to build the [Grand Unmarshaler](https://medium.com/@peterbi_91340/the-grand-unmarshaller-project-dc8aeda76f41) project for service orchestration and delegation.
+
+---
+
+### NewServiceValue
+
+```go
+func NewServiceValue(v any) (*Value, error)
+```
+
+Constructs a Value for service orchestration. Similar to NewValue but supports `[]string` format for end-node structs with service names.
+
+> **Note:** Don't use this function directly. It is exported for readers to understand how the `v any` parameter is passed to `NewServiceStruct`.
+
+**Conversion Rules:**
+
+| Go Type | Conversion | Element 0 | Element 1 |
+|---------|------------|-----------|-----------|
+| `[]string` | end SingleStruct | class name | service name |
+| `[][]string` | end ListStruct | class name | service name |
+| `map[string][]string` | end MapStruct | class name | service name |
+| `map[[2]string][]string` | end Map2Struct | class name | service name |
+| `[2]any` | SingleStruct | class name | service/fields/*Struct |
+| `[][2]any` | ListStruct | class name | service/fields/*Struct |
+| `map[string][2]any` | MapStruct | class name | service/fields/*Struct |
+| `map[[2]string][2]any` | Map2Struct | class name | service/fields/*Struct |
+| `*Struct` | SingleStruct | - | - |
+| `[]*Struct` | ListStruct | - | - |
+| `map[string]*Struct` | MapStruct | - | - |
+| `map[string]*MapStruct` | Map2Struct | - | - |
+
+---
+
+### JSMStruct
+
+```go
+func JSMStruct(className, jsonSchemaStr string) (*Struct, error)
+```
+
+Parses a JSON Schema string and converts it into a Genelet `Struct`. **Removes all `serviceName` fields** from the resulting tree. Useful when you need the data structure definition but want to decouple it from specific backend services.
+
+---
+
+### JSMServiceStruct
+
+```go
+func JSMServiceStruct(className, jsonSchemaStr string) (*Struct, error)
+```
+
+Parses a JSON Schema string and converts it into a Genelet `Struct`. **Retains all `serviceName` annotations** found in the JSON Schema.
+
+**Arguments:**
+*   `className` (string): The name assigned to the root object. Takes precedence over any `className` in the JSON.
+*   `jsonSchemaStr` (string): The standard JSON Schema (Draft-7) string to parse.
+
+---
+
+## Chapter 6. The Missing Link
 
 To understand where `genelet/schema` fits, let's look at the existing landscape:
 
@@ -19,286 +392,9 @@ To understand where `genelet/schema` fits, let's look at the existing landscape:
 
 **`genelet/schema`** is unique because it is **Schema-Driven**. It takes a description (a Schema) and instantiates a robust `Struct` object that acts as a dynamic type system. It doesn't just validate; it *defines* and *orchestrates*.
 
-## The Core Concept: `Struct` vs. `jsonSchemaStr`
+---
 
-At the heart of the package are two representations of the same thing:
-
-1.  **The `Struct`**: A Go type that represents your data structure. It holds a `ClassName`, specific `Fields` (which can be primitives, Lists, or Maps), and optional metadata.
-2.  **The `jsonSchemaStr`**: A simplified JSON Schema string that defines the `Struct`.
-
-You can convert between them seamlessly.
-
-### Chapter 1: Dynamic Interface Types
-
-Imagine you are building a low-code platform or a Terraform provider. You receive a JSON payload describing a resource, but you don't know at compile time if it's a `Database` or a `LoadBalancer`.
-
-Instead of writing a massive switch statement or generating code on the fly, you can use `JSMStruct` (JSON Schema to Struct).
-
-#### The Schema
-Lests define a schema for a generic "Person" object:
-
-```json
-{
-  "className": "Person",
-  "properties": {
-    "Name": { "className": "String" },
-    "Address": {
-      "className": "Address",
-      "properties": {
-        "City": { "className": "String" }
-      }
-    }
-  }
-}
-```
-
-#### The Code
-
-```go
-package main
-
-import (
-	"encoding/json"
-	"fmt"
-	"github.com/genelet/schema"
-)
-
-func main() {
-	jsonStr := `{...}` // The JSON above
-
-	// Parse the schema into a dynamic Struct
-	personStruct, err := schema.JSMStruct("Person", jsonStr)
-	if err != nil {
-		panic(err)
-	}
-
-	// You now have a typed definition!
-	fmt.Printf("Class: %s\n", personStruct.ClassName)
-	// Output: Class: Person
-
-	// You can traverse it dynamically
-	addressField := personStruct.Fields["Address"].GetSingleStruct()
-	fmt.Printf("Nested Class: %s\n", addressField.ClassName)
-	// Output: Nested Class: Address
-    
-    // You can even marshal it back to JSON Schema
-    out, _ := json.MarshalIndent(personStruct, "", "  ")
-    fmt.Println(string(out))
-}
-```
-
-This allows your application to handle entirely new types defined by configuration, not code.
-
-### Chapter 2: Service Orchestration
-
-This is where `genelet/schema` truly shines. In distributed systems, a schema often implies *ownership*. "This part of the configuration belongs to the **User Service**, but this nested part belongs to the **Billing Service**."
-
-The package has built-in support for `ServiceName`.
-
-#### The Orchestration Schema
-
-We use the same structure, but notice the `serviceName` field:
-
-```json
-{
-  "className": "UserProfile",
-  "serviceName": "userService",
-  "properties": {
-    "PaymentMethod": {
-      "className": "CreditCard",
-      "serviceName": "billingService",
-      "properties": { ... }
-    }
-  }
-}
-```
-
-#### The Orchestration Code
-
-We use `JSMServiceStruct` to parse this.
-
-```go
-func main() {
-	orchestrationStr := `{...}` // The JSON above with serviceNames
-
-	// Parse with Service awareness
-	root, err := schema.JSMServiceStruct("UserProfile", orchestrationStr)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Root handles by: %s\n", root.ServiceName)
-	// Output: Root handles by: userService
-
-	payment := root.Fields["PaymentMethod"].GetSingleStruct()
-	fmt.Printf("Payment handled by: %s\n", payment.ServiceName)
-	// Output: Payment handled by: billingService
-}
-```
-
-#### Why is this useful?
-
-This structure allows you to build **Schema-Driven Gateways**. Your gateway can parse an incoming request, inspect the `Struct`, and automatically route parts of the payload to different downstream microservices based on the `ServiceName` property—all without hardcoding routing rules.
-
-
-
-
-### Chapter 3: JSON Marshaling
-
-The `Struct` type implements the standard `json.Marshaler` and `json.Unmarshaler` interfaces. This means you can easily serialize your dynamic type definitions to and from JSON.
-
-This is particularly useful for tasks like:
-*   Saving a user's configuration to a database.
-*   Sending a schema definition over the wire to another service.
-*   Debugging your dynamic structures.
-
-```go
-// 1. Create a Struct definition programmatically
-spec, _ := schema.NewStruct("Person", map[string]any{
-    "Name": "String",
-    "Age":  "Integer",
-})
-
-// 2. Marshal it to JSON Schema
-data, _ := json.MarshalIndent(spec, "", "  ")
-fmt.Println(string(data))
-/* Output:
-{
-  "className": "Person",
-  "properties": {
-    "Name": { "className": "String" },
-    "Age": { "className": "Integer" }
-  }
-}
-*/
-
-// 3. Unmarshal it back into a Struct
-var newSpec schema.Struct
-checkErr(json.Unmarshal(data, &newSpec))
-```
-
-### Chapter 4: Typical Usage Patterns
-
-Here are some common patterns you'll encounter when defining schemas.
-
-#### 1. Primitives and Interfaces
-You don't need to define every single field. Standard primitives like strings and integers involve no "orchestration" or "dynamic type lookup", so they are often omitted. You only explicitly define fields that are **Interfaces** (requiring a concrete type) or need **Service Injection**.
-
-```json
-// "Simple" fields like 'Name' are omitted. 
-// "PaymentMethod" is an interface, so we define it.
-{
-  "className": "UserProfile",
-  "properties": {
-    "PaymentMethod": { "className": "CreditCard" }
-  }
-}
-```
-
-#### 2. Lists (Arrays)
-To define a list of items, use the `items` keyword. This corresponds to `[]T` in Go.
-
-```json
-{
-  "items": {
-    "className": "Person",
-    "serviceName": "userService"
-  }
-}
-// Result: A list where every item is a "Person" handled by "userService".
-```
-
-#### 3. Maps
-To define a map with string keys, use `additionalProperties`. This corresponds to `map[string]T`.
-
-```json
-{
-  "additionalProperties": {
-    "className": "ConfigItem"
-  }
-}
-// Result: A map where every value is a "ConfigItem".
-```
-
-#### 4. Two-Level Maps (Map2)
-Sometimes you need a map of maps (e.g., `Region -> Zone -> Service`). We use a custom `x-map2` extension for this.
-
-```json
-{
-  "x-map2": true,
-  "properties": {
-    "us-east": {
-      "properties": {
-        "zone-1": { "className": "Node", "serviceName": "clusterA" }
-      }
-    }
-  }
-}
-```
-
-
-### Chapter 5: Nested Usage Patterns
-
-For complex applications, you often need to mix different structures.
-
-#### 5. Mixed Fields with Services
-A struct can contain various field types (simple, list, map), all backed by different services.
-
-```json
-{
-  "properties": {
-    "SimpleField": { "className": "Metric", "serviceName": "metric_service" },
-    "ListField":   { "items": { "className": "Log", "serviceName": "log_service" } },
-    "MapField":    { "additionalProperties": { "className": "Config", "serviceName": "config_service" } }
-  }
-}
-```
-
-#### 6. Nested Structs with Services
-Fields can be defined as inline structs, eventually leading to service-backed fields deep in the hierarchy.
-
-```json
-{
-  "properties": {
-    "Group1": {
-      "className": "SubClass1",
-      "properties": {
-        "Item": { "className": "Detail", "serviceName": "s1" }
-      }
-    }
-  }
-}
-```
-
-#### 7. List of Structs with Services
-A list where the item type is a complex object (defined by properties), which in turn contains service-backed fields.
-
-```json
-{
-  "items": {
-    "className": "ItemClass",
-    "properties": {
-      "Info": { "className": "Data", "serviceName": "data_service" }
-    }
-  }
-}
-```
-
-#### 8. Map of Structs with Services
-A map where the value type is a complex object, which contains service-backed fields.
-
-```json
-{
-  "additionalProperties": {
-    "className": "EntryClass",
-    "properties": {
-      "Record": { "className": "Row", "serviceName": "db_service" }
-    }
-  }
-}
-```
-
-## Conclusion
+## Chapter 7. Conclusion
 
 `genelet/schema` provides the missing reverse-gear in the Go JSON ecosystem. By treating Schemas as first-class citizens that can be instantiated into rich, traversable Go objects, it opens the door for:
 
@@ -307,8 +403,7 @@ A map where the value type is a complex object, which contains service-backed fi
 *   **Legacy Systems Integration**: Wrap old endpoints with modern schema definitions.
 *   **Low-Code/No-Code Backends**: Handle arbitrary data structures safely.
 
-It’s time to stop fighting your JSON and start orchestrating it.
+It's time to stop fighting your JSON and start orchestrating it.
 
 Check it out at [github.com/genelet/schema](https://github.com/genelet/schema).
-
 
