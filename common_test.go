@@ -354,3 +354,48 @@ func TestServiceValueWithStructInSpec(t *testing.T) {
 	}
 	testSpec(t, mapFields["key2"])
 }
+
+func TestNewServiceValueDirectTypes(t *testing.T) {
+	// Test *Struct
+	structSpec := &Struct{ClassName: "DirectStruct"}
+	v, err := NewServiceValue(structSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.GetSingleStruct().ClassName != "DirectStruct" {
+		t.Errorf("expected DirectStruct, got %s", v.GetSingleStruct().ClassName)
+	}
+
+	// Test []*Struct
+	listSpec := []*Struct{{ClassName: "List1"}, {ClassName: "List2"}}
+	v, err = NewServiceValue(listSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ls := v.GetListStruct()
+	if len(ls.ListFields) != 2 || ls.ListFields[0].ClassName != "List1" {
+		t.Error("list struct mismatch")
+	}
+
+	// Test map[string]*Struct
+	mapSpec := map[string]*Struct{"k1": {ClassName: "Map1"}}
+	v, err = NewServiceValue(mapSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ms := v.GetMapStruct()
+	if ms.MapFields["k1"].ClassName != "Map1" {
+		t.Error("map struct mismatch")
+	}
+
+	// Test map[string]*MapStruct
+	map2Spec := map[string]*MapStruct{"k1": {MapFields: map[string]*Struct{"k2": {ClassName: "Map2"}}}}
+	v, err = NewServiceValue(map2Spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m2s := v.GetMap2Struct()
+	if m2s.Map2Fields["k1"].MapFields["k2"].ClassName != "Map2" {
+		t.Error("map2 struct mismatch")
+	}
+}

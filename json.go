@@ -7,11 +7,11 @@ import (
 
 // jsonSchema represents a subset of JSON Schema for parsing.
 type jsonSchema struct {
-	ClassName            string                 `json:"className"`
-	Properties           map[string]*jsonSchema `json:"properties"`
-	Items                *jsonSchema            `json:"items"`
-	AdditionalProperties *jsonSchema            `json:"additionalProperties"`
-	Ref                  string                 `json:"$ref"`
+	ClassName            string                 `json:"className,omitempty"`
+	Properties           map[string]*jsonSchema `json:"properties,omitempty"`
+	Items                *jsonSchema            `json:"items,omitempty"`
+	AdditionalProperties *jsonSchema            `json:"additionalProperties,omitempty"`
+	Ref                  string                 `json:"$ref,omitempty"`
 	ServiceName          string                 `json:"serviceName,omitempty"`
 	XMap2                bool                   `json:"x-map2,omitempty"`
 }

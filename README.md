@@ -244,7 +244,6 @@ Constructs a Struct for service orchestration with ClassName and optional Servic
 - `v` - Either:
   - `string` - service name for delegation
   - `map[string]any` - field specifications
-  - `*Struct` - existing Struct (fields and service name will be copied)
 
 **Examples:**
 ```go
@@ -256,9 +255,6 @@ spec, err := NewServiceStruct("Config", map[string]any{
     "Database": []string{"PostgresDB", "dbService"},
 })
 
-// With existing Struct
-innerSpec, _ := NewServiceStruct("Inner", "innerService")
-spec, err := NewServiceStruct("Wrapper", innerSpec)
 ```
 
 ---

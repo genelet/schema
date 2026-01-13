@@ -49,7 +49,7 @@ func createTypeSpec(className string, fields ...map[string]any) typeSpec {
 //	║ map[[2]string][2]any               │ Map2Struct with fields       ║
 //	║                                    │                              ║
 //	║ *Struct                            │ SingleStruct                 ║
-//	║ []*Struct                          │ ListStruct                   ║
+//	║ []*Struct                          │ ListStruct            u       ║
 //	║ map[string]*Struct                 │ MapStruct                    ║
 //	║ map[string]*MapStruct              │ Map2Struct                   ║
 //	╚════════════════════════════════════╧══════════════════════════════╝
@@ -237,13 +237,12 @@ func NewStruct(className string, fieldSpecs ...map[string]any) (*Struct, error) 
 //
 // Parameters:
 //   - className: The class/object type identifier
-//   - v: Either a service name (string), field specifications (map[string]any), or a Struct directly (*Struct)
+//   - v: Either a service name (string) or field specifications (map[string]any)
 //
 // Examples:
 //
 //	NewServiceStruct("provider", "providerService")  // Delegate to providerService
 //	NewServiceStruct("config", map[string]any{...}) // With nested field specs
-//	NewServiceStruct("wrapper", existingStruct)     // Use existing Struct
 func NewServiceStruct(className string, v any) (*Struct, error) {
 	x := &Struct{ClassName: className}
 	if v == nil {
@@ -264,10 +263,6 @@ func NewServiceStruct(className string, v any) (*Struct, error) {
 				return nil, err
 			}
 		}
-	case *Struct:
-		// Use the provided Struct's fields and service name
-		x.Fields = t.Fields
-		x.ServiceName = t.ServiceName
 	default:
 		return nil, fmt.Errorf("invalid type for service struct: %T", v)
 	}
@@ -378,6 +373,10 @@ func newMap2Struct(specs map[[2]string][2]any) (*Map2Struct, error) {
 //	║ [][2]any                  │ ListStruct       │ class name  │ service/fields/*Struct     ║
 //	║ map[string][2]any         │ MapStruct        │ class name  │ service/fields/*Struct     ║
 //	║ map[[2]string][2]any      │ Map2Struct       │ class name  │ service/fields/*Struct     ║
+//	║ *Struct                   │ SingleStruct     │ -           │ -                          ║
+//	║ []*Struct                 │ ListStruct       │ -           │ -                          ║
+//	║ map[string]*Struct        │ MapStruct        │ -           │ -                          ║
+//	║ map[string]*MapStruct     │ Map2Struct       │ -           │ -                          ║
 //	╚═══════════════════════════╧══════════════════╧═════════════╧════════════════════════════╝
 func NewServiceValue(v any) (*Value, error) {
 	switch t := v.(type) {
@@ -457,7 +456,7 @@ func newServiceSingleStruct(spec typeSpec) (*Struct, error) {
 	case map[string]any:
 		return NewServiceStruct(className, v)
 	case *Struct:
-		return NewServiceStruct(className, v)
+		return &Struct{ClassName: className, Fields: v.Fields, ServiceName: v.ServiceName}, nil
 	default:
 		return nil, fmt.Errorf("field specifications must be map[string]any, string, or *Struct, got %T", spec[1])
 	}
