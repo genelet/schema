@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -245,5 +246,116 @@ func TestJSMStruct(t *testing.T) {
 	}
 	if f1.ServiceName != "" {
 		t.Errorf("expected empty nested ServiceName, got %s", f1.ServiceName)
+	}
+}
+
+func TestJSMServiceStruct_NestedCollections(t *testing.T) {
+	jsonSchemaStr := `{
+		"properties": {
+			"matrix": {
+				"items": {
+					"items": { "className": "Cell" }
+				}
+			},
+			"listOfMaps": {
+				"items": {
+					"additionalProperties": { "className": "Entry" }
+				}
+			},
+			"mapOfLists": {
+				"additionalProperties": {
+					"items": { "className": "Item" }
+				}
+			},
+			"mapOfMaps": {
+				"additionalProperties": {
+					"additionalProperties": { "className": "Node" }
+				}
+			}
+		}
+	}`
+
+	s, err := JSMServiceStruct("Container", jsonSchemaStr)
+	if err != nil {
+		t.Fatalf("JSMServiceStruct failed: %v", err)
+	}
+
+	data, err := json.Marshal(s)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	props, ok := got["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected properties object, got %#v", got["properties"])
+	}
+
+	matrix, ok := props["matrix"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected matrix object, got %#v", props["matrix"])
+	}
+	matrixItems, ok := matrix["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected matrix.items object, got %#v", matrix["items"])
+	}
+	matrixInner, ok := matrixItems["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected matrix.items.items object, got %#v", matrixItems["items"])
+	}
+	if matrixInner["className"] != "Cell" {
+		t.Errorf("expected matrix item className Cell, got %#v", matrixInner["className"])
+	}
+
+	listOfMaps, ok := props["listOfMaps"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected listOfMaps object, got %#v", props["listOfMaps"])
+	}
+	listOfMapsItems, ok := listOfMaps["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected listOfMaps.items object, got %#v", listOfMaps["items"])
+	}
+	listOfMapsAdditional, ok := listOfMapsItems["additionalProperties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected listOfMaps.items.additionalProperties object, got %#v", listOfMapsItems["additionalProperties"])
+	}
+	if listOfMapsAdditional["className"] != "Entry" {
+		t.Errorf("expected listOfMaps entry className Entry, got %#v", listOfMapsAdditional["className"])
+	}
+
+	mapOfLists, ok := props["mapOfLists"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mapOfLists object, got %#v", props["mapOfLists"])
+	}
+	mapOfListsAdditional, ok := mapOfLists["additionalProperties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mapOfLists.additionalProperties object, got %#v", mapOfLists["additionalProperties"])
+	}
+	mapOfListsItems, ok := mapOfListsAdditional["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mapOfLists.additionalProperties.items object, got %#v", mapOfListsAdditional["items"])
+	}
+	if mapOfListsItems["className"] != "Item" {
+		t.Errorf("expected mapOfLists item className Item, got %#v", mapOfListsItems["className"])
+	}
+
+	mapOfMaps, ok := props["mapOfMaps"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mapOfMaps object, got %#v", props["mapOfMaps"])
+	}
+	mapOfMapsAdditional, ok := mapOfMaps["additionalProperties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mapOfMaps.additionalProperties object, got %#v", mapOfMaps["additionalProperties"])
+	}
+	mapOfMapsInner, ok := mapOfMapsAdditional["additionalProperties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mapOfMaps.additionalProperties.additionalProperties object, got %#v", mapOfMapsAdditional["additionalProperties"])
+	}
+	if mapOfMapsInner["className"] != "Node" {
+		t.Errorf("expected mapOfMaps inner className Node, got %#v", mapOfMapsInner["className"])
 	}
 }

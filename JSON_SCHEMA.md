@@ -131,7 +131,50 @@ To represent this structure, use the custom extension `x-map2: true`. The struct
       - "key1" -> SingleStruct("ServiceA")
       - "key2" -> SingleStruct("ServiceB")
   - "region2" -> MapStruct
-      - "key3" -> SingleStruct("ServiceC")
+  - "key3" -> SingleStruct("ServiceC")
+
+## Nested Collections
+
+`items` and `additionalProperties` can be nested to represent multi-level collection types such as `[][]T`,
+`[]map[string]T`, `map[string][]T`, and `map[string]map[string]T`.
+
+**Examples:**
+
+List of list (`[][]T`):
+```json
+{
+  "items": {
+    "items": { "className": "Person" }
+  }
+}
+```
+
+List of map (`[]map[string]T`):
+```json
+{
+  "items": {
+    "additionalProperties": { "className": "Person" }
+  }
+}
+```
+
+Map of list (`map[string][]T`):
+```json
+{
+  "additionalProperties": {
+    "items": { "className": "Person" }
+  }
+}
+```
+
+Map of map (`map[string]map[string]T`):
+```json
+{
+  "additionalProperties": {
+    "additionalProperties": { "className": "Person" }
+  }
+}
+```
 
 ## Service Decoration
 

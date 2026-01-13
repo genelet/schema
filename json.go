@@ -16,6 +16,37 @@ type jsonSchema struct {
 	XMap2                bool                   `json:"x-map2,omitempty"`
 }
 
+const (
+	wrapperClassName = "__schema_wrapper__"
+	wrapperFieldName = "__schema_value__"
+)
+
+func wrapValueAsStruct(v *Value) *Struct {
+	if v == nil {
+		return nil
+	}
+	return &Struct{
+		ClassName: wrapperClassName,
+		Fields: map[string]*Value{
+			wrapperFieldName: v,
+		},
+	}
+}
+
+func unwrapValueFromStruct(s *Struct) (*Value, bool) {
+	if s == nil {
+		return nil, false
+	}
+	if s.ClassName != wrapperClassName || len(s.Fields) != 1 {
+		return nil, false
+	}
+	v, ok := s.Fields[wrapperFieldName]
+	if !ok {
+		return nil, false
+	}
+	return v, true
+}
+
 // JSMServiceStruct creates a Struct from a JSON Schema string.
 //
 // converting Standard JSON Schema to Genelet Schema Struct:
@@ -190,17 +221,8 @@ func extractStructFromValue(v *Value) *Struct {
 	if s := v.GetSingleStruct(); s != nil {
 		return s
 	}
-	// If it's a list or map, we wrap it?
-	// But Struct doesn't wrap Value directly. Struct has Fields (map string->Value).
-	// We return a Struct that has NO ClassName (wrapper) but holds the Value in a field?
-	// Or we return a Struct with ClassName=value's type?
-	// This is ambiguous.
-	// For now, if we get a ListStruct from a sub-schema, we probably want to return a Struct that Represents that list?
-	// But `MapStruct` needs `*Struct` as value.
-	// So if we have Map<String, List<int>>, we need MapStruct->Struct->Fields["items"]->ListStruct?
-	// But simplistically, if we just want to avoid panic/nil, return a placeholder.
-	// In strict mode we might error.
-	return &Struct{ClassName: "WrappedComplexType"}
+	// Wrap non-SingleStruct values so nested list/map types can round-trip.
+	return wrapValueAsStruct(v)
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -255,6 +277,9 @@ func (s *Struct) UnmarshalJSON(data []byte) error {
 func convertStructToSchema(s *Struct) (*jsonSchema, error) {
 	if s == nil {
 		return nil, nil
+	}
+	if v, ok := unwrapValueFromStruct(s); ok {
+		return convertValueToSchema(v)
 	}
 	js := &jsonSchema{
 		ClassName:   s.ClassName,
