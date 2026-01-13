@@ -17,8 +17,9 @@ type jsonSchema struct {
 }
 
 const (
-	wrapperClassName = "__schema_wrapper__"
-	wrapperFieldName = "__schema_value__"
+	wrapperClassName   = "__schema_wrapper__"
+	wrapperFieldName   = "__schema_value__"
+	wrapperServiceName = "__schema_wrapper_service__"
 )
 
 func wrapValueAsStruct(v *Value) *Struct {
@@ -26,7 +27,8 @@ func wrapValueAsStruct(v *Value) *Struct {
 		return nil
 	}
 	return &Struct{
-		ClassName: wrapperClassName,
+		ClassName:   wrapperClassName,
+		ServiceName: wrapperServiceName,
 		Fields: map[string]*Value{
 			wrapperFieldName: v,
 		},
@@ -37,11 +39,14 @@ func unwrapValueFromStruct(s *Struct) (*Value, bool) {
 	if s == nil {
 		return nil, false
 	}
-	if s.ClassName != wrapperClassName || len(s.Fields) != 1 {
+	if s.ClassName != wrapperClassName || s.ServiceName != wrapperServiceName || len(s.Fields) != 1 {
 		return nil, false
 	}
 	v, ok := s.Fields[wrapperFieldName]
 	if !ok {
+		return nil, false
+	}
+	if v == nil || v.GetSingleStruct() != nil {
 		return nil, false
 	}
 	return v, true

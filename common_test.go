@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -51,23 +52,23 @@ func testSpec(t *testing.T, sp *Struct) {
 	slist := fields["EndList"].GetListStruct()
 	smap := fields["EndMap"].GetMapStruct()
 
-	if s.ClassName != "Circle1" && s.ServiceName != "service1" {
+	if s.ClassName != "Circle1" || s.ServiceName != "service1" {
 		t.Errorf("%#v", s.Fields)
 	}
 	s = slist.ListFields[0]
-	if s.ClassName != "Circle2" && s.ServiceName != "service2" {
+	if s.ClassName != "Circle2" || s.ServiceName != "service2" {
 		t.Errorf("%#v", s.Fields)
 	}
 	s = slist.ListFields[1]
-	if s.ClassName != "Circle3" && s.ServiceName != "service3" {
+	if s.ClassName != "Circle3" || s.ServiceName != "service3" {
 		t.Errorf("%#v", s.Fields)
 	}
 	s = smap.MapFields["key1"]
-	if s.ClassName != "Circle2" && s.ServiceName != "service2" {
+	if s.ClassName != "Circle2" || s.ServiceName != "service2" {
 		t.Errorf("%#v", s.Fields)
 	}
 	s = smap.MapFields["key2"]
-	if s.ClassName != "Circle3" && s.ServiceName != "service3" {
+	if s.ClassName != "Circle3" || s.ServiceName != "service3" {
 		t.Errorf("%#v", s.Fields)
 	}
 }
@@ -353,6 +354,68 @@ func TestServiceValueWithStructInSpec(t *testing.T) {
 		t.Errorf("expected ClassName 'WrapperClass2', got %q", mapFields["key2"].ClassName)
 	}
 	testSpec(t, mapFields["key2"])
+}
+
+func TestNewServiceStruct_ServiceNameMustBeLeaf(t *testing.T) {
+	bad := &Struct{
+		ClassName:   "Inner",
+		ServiceName: "svc",
+		Fields: map[string]*Value{
+			"Field": {Kind: &Value_SingleStruct{SingleStruct: &Struct{ClassName: "Leaf"}}},
+		},
+	}
+
+	_, err := NewServiceStruct("Wrapper", bad)
+	if err == nil {
+		t.Fatal("expected error for service name on non-leaf struct")
+	}
+}
+
+func TestNewServiceValue_ServiceNameMustBeLeaf(t *testing.T) {
+	bad := &Struct{
+		ClassName:   "Inner",
+		ServiceName: "svc",
+		Fields: map[string]*Value{
+			"Field": {Kind: &Value_SingleStruct{SingleStruct: &Struct{ClassName: "Leaf"}}},
+		},
+	}
+
+	if _, err := NewServiceValue(bad); err == nil {
+		t.Fatal("expected error for service name on non-leaf struct")
+	}
+}
+
+func TestNewServiceStruct_ServiceNameLeafAllowed(t *testing.T) {
+	leaf := &Struct{
+		ClassName:   "Inner",
+		ServiceName: "svc",
+	}
+
+	got, err := NewServiceStruct("Wrapper", leaf)
+	if err != nil {
+		t.Fatalf("expected leaf service struct to pass, got %v", err)
+	}
+	if got.ServiceName != "svc" {
+		t.Fatalf("expected ServiceName to be preserved, got %q", got.ServiceName)
+	}
+}
+
+func TestNewServiceStruct_ServiceNameMustBeLeafErrorMessage(t *testing.T) {
+	bad := &Struct{
+		ClassName:   "Inner",
+		ServiceName: "svc",
+		Fields: map[string]*Value{
+			"Field": {Kind: &Value_SingleStruct{SingleStruct: &Struct{ClassName: "Leaf"}}},
+		},
+	}
+
+	_, err := NewServiceStruct("Wrapper", bad)
+	if err == nil {
+		t.Fatal("expected error for service name on non-leaf struct")
+	}
+	if !strings.Contains(err.Error(), "service name must be on leaf struct") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestNewServiceValueDirectTypes(t *testing.T) {

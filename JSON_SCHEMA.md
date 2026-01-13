@@ -176,6 +176,10 @@ Map of map (`map[string]map[string]T`):
 }
 ```
 
+**Reserved values:** For nested collection support, the library uses an internal wrapper with
+`className="__schema_wrapper__"`, `serviceName="__schema_wrapper_service__"`, and a single field named
+`"__schema_value__"`. Avoid using these exact values in your own schemas.
+
 ## Service Decoration
 
 The `serviceName` keyword can be added to any schema node to specify the service responsible for that data.

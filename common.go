@@ -237,12 +237,13 @@ func NewStruct(className string, fieldSpecs ...map[string]any) (*Struct, error) 
 //
 // Parameters:
 //   - className: The class/object type identifier
-//   - v: Either a service name (string) or field specifications (map[string]any)
+//   - v: Either a service name (string), field specifications (map[string]any), or a Struct directly (*Struct)
 //
 // Examples:
 //
 //	NewServiceStruct("provider", "providerService")  // Delegate to providerService
 //	NewServiceStruct("config", map[string]any{...}) // With nested field specs
+//	NewServiceStruct("wrapper", existingStruct)     // Use existing Struct
 func NewServiceStruct(className string, v any) (*Struct, error) {
 	x := &Struct{ClassName: className}
 	if v == nil {
@@ -263,10 +264,98 @@ func NewServiceStruct(className string, v any) (*Struct, error) {
 				return nil, err
 			}
 		}
+	case *Struct:
+		// Use the provided Struct's fields and service name
+		x.Fields = t.Fields
+		x.ServiceName = t.ServiceName
 	default:
 		return nil, fmt.Errorf("invalid type for service struct: %T", v)
 	}
+	if err := validateServiceEndStruct(x); err != nil {
+		return nil, err
+	}
 	return x, nil
+}
+
+func validateServiceEndStruct(s *Struct) error {
+	return validateServiceEndStructWithSeen(s, map[*Struct]struct{}{}, "")
+}
+
+func validateServiceEndStructWithSeen(s *Struct, seen map[*Struct]struct{}, path string) error {
+	if s == nil {
+		return nil
+	}
+	if path == "" {
+		if s.ClassName != "" {
+			path = s.ClassName
+		} else {
+			path = "<root>"
+		}
+	}
+	if _, ok := seen[s]; ok {
+		return nil
+	}
+	seen[s] = struct{}{}
+	if s.ServiceName != "" && len(s.Fields) > 0 {
+		return fmt.Errorf("service name must be on leaf struct at %s", path)
+	}
+	for name, v := range s.Fields {
+		childPath := path + "." + name
+		if err := validateServiceEndValueWithSeen(v, seen, childPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateServiceEndValue(v *Value) error {
+	return validateServiceEndValueWithSeen(v, map[*Struct]struct{}{}, "")
+}
+
+func validateServiceEndValueWithSeen(v *Value, seen map[*Struct]struct{}, path string) error {
+	if v == nil {
+		return nil
+	}
+	if path == "" {
+		path = "<root>"
+	}
+	switch k := v.Kind.(type) {
+	case *Value_SingleStruct:
+		return validateServiceEndStructWithSeen(k.SingleStruct, seen, path)
+	case *Value_ListStruct:
+		if k.ListStruct == nil {
+			return nil
+		}
+		for i, s := range k.ListStruct.ListFields {
+			if err := validateServiceEndStructWithSeen(s, seen, fmt.Sprintf("%s[%d]", path, i)); err != nil {
+				return err
+			}
+		}
+	case *Value_MapStruct:
+		if k.MapStruct == nil {
+			return nil
+		}
+		for key, s := range k.MapStruct.MapFields {
+			if err := validateServiceEndStructWithSeen(s, seen, fmt.Sprintf("%s[%q]", path, key)); err != nil {
+				return err
+			}
+		}
+	case *Value_Map2Struct:
+		if k.Map2Struct == nil {
+			return nil
+		}
+		for outerKey, ms := range k.Map2Struct.Map2Fields {
+			if ms == nil {
+				continue
+			}
+			for innerKey, s := range ms.MapFields {
+				if err := validateServiceEndStructWithSeen(s, seen, fmt.Sprintf("%s[%q][%q]", path, outerKey, innerKey)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // newSingleStruct creates a Struct from a type specification.
@@ -385,60 +474,67 @@ func NewServiceValue(v any) (*Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &Value{Kind: &Value_SingleStruct{SingleStruct: v2}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_SingleStruct{SingleStruct: v2}})
 	case [][]string:
 		v2, err := newEndListStruct(t)
 		if err != nil {
 			return nil, err
 		}
-		return &Value{Kind: &Value_ListStruct{ListStruct: v2}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_ListStruct{ListStruct: v2}})
 	case map[string][]string:
 		v2, err := newEndMapStruct(t)
 		if err != nil {
 			return nil, err
 		}
-		return &Value{Kind: &Value_MapStruct{MapStruct: v2}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_MapStruct{MapStruct: v2}})
 	case map[[2]string][]string:
 		v2, err := newEndMap2Struct(t)
 		if err != nil {
 			return nil, err
 		}
-		return &Value{Kind: &Value_Map2Struct{Map2Struct: v2}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_Map2Struct{Map2Struct: v2}})
 	case [2]any:
 		v2, err := newServiceSingleStruct(t)
 		if err != nil {
 			return nil, err
 		}
-		return &Value{Kind: &Value_SingleStruct{SingleStruct: v2}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_SingleStruct{SingleStruct: v2}})
 	case [][2]any:
 		v2, err := newServiceListStruct(t)
 		if err != nil {
 			return nil, err
 		}
-		return &Value{Kind: &Value_ListStruct{ListStruct: v2}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_ListStruct{ListStruct: v2}})
 	case map[string][2]any:
 		v2, err := newServiceMapStruct(t)
 		if err != nil {
 			return nil, err
 		}
-		return &Value{Kind: &Value_MapStruct{MapStruct: v2}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_MapStruct{MapStruct: v2}})
 	case map[[2]string][2]any:
 		v2, err := newServiceMap2Struct(t)
 		if err != nil {
 			return nil, err
 		}
-		return &Value{Kind: &Value_Map2Struct{Map2Struct: v2}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_Map2Struct{Map2Struct: v2}})
 	case *Struct:
-		return &Value{Kind: &Value_SingleStruct{SingleStruct: t}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_SingleStruct{SingleStruct: t}})
 	case []*Struct:
-		return &Value{Kind: &Value_ListStruct{ListStruct: &ListStruct{ListFields: t}}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_ListStruct{ListStruct: &ListStruct{ListFields: t}}})
 	case map[string]*Struct:
-		return &Value{Kind: &Value_MapStruct{MapStruct: &MapStruct{MapFields: t}}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_MapStruct{MapStruct: &MapStruct{MapFields: t}}})
 	case map[string]*MapStruct:
-		return &Value{Kind: &Value_Map2Struct{Map2Struct: &Map2Struct{Map2Fields: t}}}, nil
+		return finalizeServiceValue(&Value{Kind: &Value_Map2Struct{Map2Struct: &Map2Struct{Map2Fields: t}}})
 	default:
 		return nil, fmt.Errorf("unsupported type for NewServiceValue: %T", v)
 	}
+}
+
+func finalizeServiceValue(v *Value) (*Value, error) {
+	if err := validateServiceEndValue(v); err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 // newServiceSingleStruct creates a Struct from a type specification for service orchestration.
