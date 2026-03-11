@@ -237,7 +237,7 @@ func (s *Struct) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(js)
+	return json.Marshal(schemaToJSONValue(js))
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
@@ -379,4 +379,40 @@ func convertValueToSchema(v *Value) (*jsonSchema, error) {
 	default:
 		return nil, fmt.Errorf("unknown Value kind: %T", v.Kind)
 	}
+}
+
+func schemaToJSONValue(js *jsonSchema) any {
+	if js == nil {
+		return nil
+	}
+
+	out := make(map[string]any)
+	if js.ClassName != "" {
+		out["className"] = js.ClassName
+	}
+	if len(js.Properties) > 0 {
+		props := make(map[string]any)
+		for name, child := range js.Properties {
+			props[name] = schemaToJSONValue(child)
+		}
+		if len(props) > 0 {
+			out["properties"] = props
+		}
+	}
+	if js.Items != nil {
+		out["items"] = schemaToJSONValue(js.Items)
+	}
+	if js.AdditionalProperties != nil {
+		out["additionalProperties"] = schemaToJSONValue(js.AdditionalProperties)
+	}
+	if js.Ref != "" {
+		out["$ref"] = js.Ref
+	}
+	if js.ServiceName != "" {
+		out["serviceName"] = js.ServiceName
+	}
+	if js.XMap2 {
+		out["x-map2"] = true
+	}
+	return out
 }

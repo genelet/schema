@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -107,6 +108,34 @@ func TestJSONString(t *testing.T) {
 	}
 	if jsFieldsService["TheMap888"].GetMapStruct().MapFields["*"].ServiceName != fieldsService["TheMap888"].GetMapStruct().MapFields["a1"].ServiceName {
 		t.Errorf("TheMap888 service mismatch")
+	}
+}
+
+func TestMarshalJSONOmitsNoise(t *testing.T) {
+	spec, err := NewServiceStruct(
+		"Team", map[string]any{
+			"Colorfuls": [][]string{{"Colorful", "user-UserRecord"}},
+			"Issuers": map[string][]string{
+				"telegram": {"TelegramIssuer"},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bs, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(bs)
+	for _, bad := range []string{`"className":""`, `"$ref":""`, `:null`} {
+		if strings.Contains(got, bad) {
+			t.Fatalf("marshal output still contains %s: %s", bad, got)
+		}
+	}
+	if !strings.Contains(got, `"serviceName":"user-UserRecord"`) {
+		t.Fatalf("marshal output missing serviceName: %s", got)
 	}
 }
 
