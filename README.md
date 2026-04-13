@@ -1,8 +1,8 @@
 # Package schema
 
-[![GoDoc](https://godoc.org/github.com/genelet/schema?status.svg)](https://godoc.org/github.com/genelet/schema)
+[![GoDoc](https://godoc.org/github.com/tabilet/schema?status.svg)](https://godoc.org/github.com/tabilet/schema)
 
-Package `schema` provides unified data structures for describing hierarchical configuration schemas. It consolidates types from `horizon/utils`, `determined/det`, and `grand/spec` into a single shared definition.
+Package `schema` provides unified data structures for describing hierarchical configuration schemas. It consolidates types from `horizon/utils` and `determined/det` into a single shared definition.
 
 For a detailed guide on representing these structures using JSON Schema, see [JSON Schema Representation](JSON_SCHEMA.md).
 
@@ -16,7 +16,7 @@ The schema package defines types used across multiple packages for:
 ## Installation
 
 ```bash
-go get github.com/genelet/schema
+go get github.com/tabilet/schema
 ```
 
 ## Schema Types
@@ -397,11 +397,10 @@ This package is used as the canonical source by:
 
 - `github.com/genelet/horizon/utils` - Type aliases for HCL unmarshaling
 - `github.com/genelet/determined/det` - Type aliases for JSON unmarshaling
-- `github.com/genelet/grand/spec` - Type aliases for service orchestration
 
 Example alias in dependent packages:
 ```go
-import "github.com/genelet/schema"
+import "github.com/tabilet/schema"
 
 type Struct = schema.Struct
 type Value = schema.Value
