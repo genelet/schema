@@ -1,4 +1,4 @@
-module github.com/genelet/schema
+module github.com/tabilet/schema
 
 go 1.24.0
 
