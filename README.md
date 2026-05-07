@@ -1,6 +1,6 @@
 # Package schema
 
-[![GoDoc](https://godoc.org/github.com/tabilet/schema?status.svg)](https://godoc.org/github.com/tabilet/schema)
+[![GoDoc](https://godoc.org/github.com/OpenUdon/schema?status.svg)](https://godoc.org/github.com/OpenUdon/schema)
 
 Package `schema` provides unified data structures for describing hierarchical configuration schemas. It consolidates types from `horizon/utils` and `determined/det` into a single shared definition.
 
@@ -16,7 +16,7 @@ The schema package defines types used across multiple packages for:
 ## Installation
 
 ```bash
-go get github.com/tabilet/schema
+go get github.com/OpenUdon/schema
 ```
 
 ## Schema Types
@@ -400,7 +400,7 @@ This package is used as the canonical source by:
 
 Example alias in dependent packages:
 ```go
-import "github.com/tabilet/schema"
+import "github.com/OpenUdon/schema"
 
 type Struct = schema.Struct
 type Value = schema.Value

@@ -1,5 +1,5 @@
-module github.com/tabilet/schema
+module github.com/OpenUdon/schema
 
 go 1.24.0
 
-require google.golang.org/protobuf v1.36.10
+require google.golang.org/protobuf v1.36.11
